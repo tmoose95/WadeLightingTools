@@ -160,16 +160,16 @@
   {
     "id": "WadePluginUpdater",
     "name": "WLT Plugin Updator",
-    "version": "1.1.3",
+    "version": "1.1.4",
     "folder": "WLT Plugin Updator",
-    "archive": "WLT Plugin Updator_v1.1.3.zip",
+    "archive": "WLT Plugin Updator_v1.1.4.zip",
     "minimum": "2.5.1.0",
     "note": "Three-tab updater with per-plugin actions, red/green version cells, all-DataPool destinations and console HTTPS with bundled Mozilla certificates. Utility Plugins.",
-    "manifest": "packages/WadePluginUpdater/1.1.3/manifest.tsv",
-    "digest": "6a7066704bbe1416e415d034522b05cfe640e38db2d110f2fdd9b5c930eb9501",
-    "xml": "WLT Plugin Updator_v1.1.3.xml",
-    "bytes": 284990,
-    "zip_sha256": "8110f1970f3f9700441d6ecf8f3faee920109f8e114428758877c42c2f1eaab3",
+    "manifest": "packages/WadePluginUpdater/1.1.4/manifest.tsv",
+    "digest": "597e81519f0590e18e8d775cd38472daa828a328a0aac3577242e2b18aa186f7",
+    "xml": "WLT Plugin Updator_v1.1.4.xml",
+    "bytes": 287696,
+    "zip_sha256": "b8445d2e9ec10463f3d6006abb6f6eb6062d7d0f6970078dd48780458379fbc3",
     "image": "WadePluginUpdater.png",
     "summary": "Scan drives, compare versions, and download or install your Wade plugins."
   }

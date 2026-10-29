@@ -18,7 +18,7 @@ local function obj(properties,n)
    return true
   end
   write(path..'/'..name,'<GMA3><UserPlugin Name="'..self.props.Name..'" Author="Aaron Wade" Version="'..self.props.Version..'" Path="/ServerCommand"><ComponentLua FileName="original.lua" /></UserPlugin></GMA3>')
-  if not self.missingBackup then write(path..'/original.lua','return function() end')end;return true
+  if not self.missingBackup then write(path..'/original.lua',self.emptyBackup and '' or 'return function() end')end;return true
  end
  return o
 end
@@ -27,10 +27,10 @@ local function test(name,fn)fn();count=count+1;print('PASS '..name)end
 local catalogText=assert(read('catalog.tsv'))
 local all=C.catalog(catalogText);local p;for _,v in ipairs(all)do if v.id=='ServerCommand'then p=v end end
 local single='WLT-CATALOG\t1\n'..table.concat({'PLUGIN',p.id,p.name,p.version,p.minimum,p.folder,p.manifest,p.digest},'\t')..'\n'
-local root,pool,drives,R,trace,mode,calls,imports
+local root,pool,drives,R,trace,mode,calls,imports,progress,repairs
 local function setup(options)
  options=options or {};local path=home..'/case'..(count+1);mkdir(path)
- trace={};calls={};imports={};mode=options
+ trace={};calls={};imports={};progress={};repairs={};mode=options
  local d1=obj({Name='Internal',Path=path..'/internal',DriveType='Harddisk'},1)
  local d2=obj({Name='USB A',Path=path..'/usb-a',DriveType='Removeable'},2)
  local d7=obj({Name='USB B',Path=path..'/usb-b',DriveType='Removable'},7)
@@ -71,6 +71,7 @@ local function setup(options)
  local clock=0;function Time()clock=clock+.2;return clock end
  function HostOS()return 'Linux'end;function Version()return options.oldRuntime and '2.4.0.0'or '2.5.1.1'end
  function Printf()end
+ function MessageBox(box)repairs[#repairs+1]=box;return {success=true,result=options.repair and 1 or 0}end
  local function add(slot,ver,target)
   target=target or pool
   local h=obj({Name='Server Command',Version=ver or '2.3.14',Author='Aaron Wade',Path='/ServerCommand',Lock='No'},slot)
@@ -107,16 +108,21 @@ local function setup(options)
   return 'Ok'
  end
  local function transport()
-  return {get=function(remote)
+  return {get=function(remote,limit,onProgress)
    trace[#trace+1]='http:'..remote
    if options.offline then error('offline')end
    if remote=='catalog.tsv'then return options.fullCatalog and catalogText or single end
    local result=assert(read(remote));if options.corrupt and remote:match('%.lua$')then result=result..'x'end
+   if onProgress then onProgress(0);onProgress(math.floor(#result/2));onProgress(#result)end
+   if options.cancelDownload and onProgress then R.cancel=true end
    return result
   end}
  end
- R=Runtime(C,transport,single,function()end,updater)
+ R=Runtime(C,transport,single,function(text,current,total,log)
+  if current and total then progress[#progress+1]={text=text,value=current/total,log=log}end
+ end,updater)
  R.scan(true)
+ progress={}
  return add
 end
 local function localPackage(d,version)
@@ -346,5 +352,53 @@ test('Invalid drive Lua stops before any pool object receives Import',function()
  local result=R.run(R.plan({ServerCommand=3}))
  assert(result:match('^FAILED') and result:find('Lua component does not compile',1,true),result)
  assert(#imports==0 and pool.Plugins[13].props.Version=='2.3.14')
+end)
+local function progressCheck(complete)
+ assert(progress[1].value==0)
+ local last=0;local between=0
+ for _,x in ipairs(progress)do
+  assert(x.value>=last and x.value<=1,'Progress moved backwards/out of range')
+  last=x.value;if last>0 and last<1 then between=between+1 end
+ end
+ assert(between>2,'No intermediate progress')
+ assert(complete and last==1 or not complete and last<1,'Incorrect completion progress')
+end
+test('Download-only progress advances through bytes and both verified drives',function()
+ setup();R.selectedDrives[drives[3].props.Path]=true
+ assert(R.run(R.plan({ServerCommand=2})):match('^OK'));progressCheck(true)
+ local partial=false;for _,x in ipairs(progress)do if x.log==false and x.text:find('Downloading',1,true) and x.value>0 and x.value<.6 then partial=true end end
+ assert(partial,'Transfer callback did not advance progress')
+end)
+test('Online import progress waits for imported code verification',function()
+ setup({installed='2.3.14',two=true});assert(R.run(R.plan({ServerCommand=1})):match('^OK'));progressCheck(true)
+ assert(progress[#progress].text=='Update complete - all selected actions verified')
+end)
+test('Offline drive import has progressive backup/preparation/per-slot verification',function()
+ setup({offline=true,installed='2.3.14',two=true});localPackage(drives[2],'2.3.15');R.scan(false);progress={}
+ assert(R.run(R.plan({ServerCommand=3})):match('^OK'));progressCheck(true)
+end)
+test('Failure and cancellation never announce 100 percent',function()
+ setup({staleCode=true,installed='2.3.14'});assert(R.run(R.plan({ServerCommand=1})):match('^FAILED'));progressCheck(false)
+ setup({cancelDownload=true});assert(R.run(R.plan({ServerCommand=2})):match('^FAILED'));progressCheck(false);assert(#imports==0)
+end)
+test('Zero-byte existing Lua can be repaired only after preserving it and confirming',function()
+ setup({installed='2.3.14',repair=true});pool.Plugins[13].emptyBackup=true
+ local plan=R.plan({ServerCommand=1});local result=R.run(plan);assert(result:match('^OK'),result)
+ local backup=plan.items[1].slots[1].backup
+ assert(read(backup..'/original.lua')=='');assert(read(backup..'/INCOMPLETE-BACKUP.txt'))
+ assert(#repairs==1 and repairs[1].message:find('cannot restore working code',1,true))
+ assert(#imports==1 and pool.Plugins[13].imported.codes[1]==read('packages/ServerCommand/2.3.15/ServerCommand/Server_Command.lua'))
+end)
+test('Declining empty-component repair preserves the existing slot and snapshot',function()
+ setup({installed='2.3.14'});pool.Plugins[13].emptyBackup=true
+ local plan=R.plan({ServerCommand=1});local result=R.run(plan)
+ assert(result:match('^FAILED') and result:find('Repair cancelled',1,true),result)
+ assert(#imports==0 and pool.Plugins[13].props.Version=='2.3.14')
+ assert(read(plan.items[1].slots[1].backup..'/original.lua')=='');progressCheck(false)
+end)
+test('Invalid replacement never prompts repair or changes an empty slot',function()
+ setup({offline=true,installed='2.3.14',repair=true});pool.Plugins[13].emptyBackup=true
+ local folder=localPackage(drives[2],'2.3.15');R.scan(false);write(folder..'/Server_Command.lua','broken Lua (')
+ assert(R.run(R.plan({ServerCommand=3})):match('^FAILED'));assert(#repairs==0 and #imports==0)
 end)
 print(count..' runtime scenarios passed (mock MA environment)')

@@ -94,22 +94,6 @@
     "summary": "Find DataPool objects and navigate to them through a dedicated search window."
   },
   {
-    "id": "WadePluginUpdater",
-    "name": "Plugin Updator",
-    "version": "1.0.1",
-    "folder": "WadePluginUpdater",
-    "archive": "PluginUpdator_v1.0.1.zip",
-    "minimum": "2.5.1.0",
-    "note": "Scan connected drives, compare installed/local/online versions, and download or install WadeLightingTools releases. Utility Plugins.",
-    "manifest": "packages/WadePluginUpdater/1.0.1/manifest.tsv",
-    "digest": "c441ebe7f225ef5fddd69e1057b733e9b09d802c3966498ab0839b276b6b0155",
-    "xml": "PluginUpdator_v1.0.1.xml",
-    "bytes": 179380,
-    "zip_sha256": "76d36d92e9e717716f2b071dab2b76f7ae033d9ce1cf44acf75bc0c8791b9f70",
-    "image": "WadePluginUpdater.png",
-    "summary": "Scan drives, compare versions, and download or install your Wade plugins."
-  },
-  {
     "id": "ServerCommand",
     "name": "Server Command",
     "version": "2.3.15",
@@ -172,5 +156,21 @@
     "zip_sha256": "4b3d5c014a48431f36e75d2222797257543eb16058469cf0c897ab0af48e4136",
     "image": "WingConfigurator.png",
     "summary": "Identify executor surfaces, assign Wing IDs and organize your desk."
+  },
+  {
+    "id": "WadePluginUpdater",
+    "name": "WLT Plugin Updator",
+    "version": "1.0.2",
+    "folder": "WLT Plugin Updator",
+    "archive": "WLT Plugin Updator_v1.0.2.zip",
+    "minimum": "2.5.1.0",
+    "note": "Scan connected drives, compare installed/local/online versions, and download or install WadeLightingTools releases. Utility Plugins.",
+    "manifest": "packages/WadePluginUpdater/1.0.2/manifest.tsv",
+    "digest": "b0c98da739d4b31aa1060bbe03759a8fb1a92f005388abc4e2b64172fd0fb758",
+    "xml": "WLT Plugin Updator_v1.0.2.xml",
+    "bytes": 159918,
+    "zip_sha256": "8d7501425fc1a3119d5257b156ba133c7b12bb2eaade3a768a1e1ca719b6620c",
+    "image": "WadePluginUpdater.png",
+    "summary": "Scan drives, compare versions, and download or install your Wade plugins."
   }
 ]

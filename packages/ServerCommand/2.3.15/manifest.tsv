@@ -1,0 +1,8 @@
+WLT-RELEASE	1	ServerCommand	2.3.15	ServerCommand	Server_Command_v2.3.15.xml
+FILE	Hippo_OSC_Setup.md	packages/ServerCommand/2.3.15/ServerCommand/Hippo_OSC_Setup.md	684	c57776a3a6b444ca7c18999d039f45e973e1797c651887840d1e6b7d5e361f23
+FILE	README.md	packages/ServerCommand/2.3.15/ServerCommand/README.md	7134	656099309f30d38c2de8fea4cd8815e1f13cfc128e5a59b5e41abeb44ba438e4
+FILE	ServerCommandLogo.png	packages/ServerCommand/2.3.15/ServerCommand/ServerCommandLogo.png	37277	e12c93cd45eb1b3c7702bb569caaeda9ef89f48bf105f6b61bc535d8e065ec3b
+FILE	Server_Command.lua	packages/ServerCommand/2.3.15/ServerCommand/Server_Command.lua	55203	7c51a66ffa1cfa4eefd69082b8f558fba649c2739cb4523188865cd5ee89b2d0
+FILE	Server_Command_v2.3.15.xml	packages/ServerCommand/2.3.15/ServerCommand/Server_Command_v2.3.15.xml	52380	b8334cf966166865eb4b8a22827a61d21400f27b4ec7009cf07524fa34055156
+FILE	Verification.txt	packages/ServerCommand/2.3.15/ServerCommand/Verification.txt	1671	f18a959fa7d1004a339efdbef02c56c9367233ebf201c1798e78bd3de3817ecf
+ZIP	ServerCommand_v2.3.15.zip	releases/ServerCommand_v2.3.15.zip	95319	ec3ede6762e508ea521ebc2c52bbb0298f6088d386647e90bbbb177bc13994d4

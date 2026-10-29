@@ -59,6 +59,7 @@ subprocess.run([lua,'-e','assert(_VERSION == "Lua 5.5", "MA3 2.5 validation requ
 with tempfile.TemporaryDirectory(prefix='wlt-compile-') as directory:
     with zipfile.ZipFile(ROOT/'releases'/up['archive']) as z:
         main=z.read(up['folder']+'/'+up['name']+'.lua')
+    assert b':Import(' not in main and b'Worker.run(' not in main and b'LuaFile ' not in main, 'Containment build includes an import/continuation route'
     release=Path(directory)/'release.lua';release.write_bytes(main)
     for scenario in ('normal','missing-type','empty-type','missing-root'):
         subprocess.run([lua,'tests/release_startup.lua',str(release),scenario,up['version']],cwd=ROOT,check=True)

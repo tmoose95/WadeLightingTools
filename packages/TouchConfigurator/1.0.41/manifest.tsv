@@ -1,0 +1,5 @@
+WLT-RELEASE	1	TouchConfigurator	1.0.41	TouchConfigurator	TouchConfigurator_v1.0.41.xml
+FILE	README.txt	packages/TouchConfigurator/1.0.41/TouchConfigurator/README.txt	3191	22546e80ef1e8d8b4e899073caa276b9151225cfa9a7ffd6ac2f9d172473bea6
+FILE	TouchConfigurator.lua	packages/TouchConfigurator/1.0.41/TouchConfigurator/TouchConfigurator.lua	35334	b4a937873212154bd339400ba46081c1f86a1fc9b7fbbf27c2c989a3e9a5d9a7
+FILE	TouchConfigurator_v1.0.41.xml	packages/TouchConfigurator/1.0.41/TouchConfigurator/TouchConfigurator_v1.0.41.xml	107695	710a4b5d3f97d82147bb0afcc8c5279166e00f60dc5f988d6806d06a8959a692
+ZIP	TouchConfigurator_v1.0.41.zip	releases/TouchConfigurator_v1.0.41.zip	90648	395b00796edb192e2ea1ff3f2f6e5f88590c7fd16382b6da4b310393b49a6894

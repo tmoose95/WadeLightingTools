@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Offline release, website-link and Lua source validation; no MA hardware actions."""
-import base64, hashlib, json, re, shutil, subprocess, zipfile
+import base64, hashlib, json, os, re, shutil, subprocess, tempfile, zipfile
 from pathlib import Path
 from html.parser import HTMLParser
 from urllib.parse import urlsplit, unquote
@@ -44,16 +44,22 @@ for row in rows:
         assert len(data)==int(size) and hashlib.sha256(data).hexdigest()==digest,path
 up=next(r for r in rows if r['id']=='WadePluginUpdater')
 with zipfile.ZipFile(ROOT/'releases'/up['archive']) as z:
-    xml=ET.fromstring(z.read('WadePluginUpdater/'+up['xml']))
+    xml=ET.fromstring(z.read(up['folder']+'/'+up['xml']))
     plugin=xml.find('UserPlugin');assert 'Tags' not in plugin.attrib
     appearance=next(xml.iter('Appearance'));assert len(appearance.get('Color').split(','))==4
     image=next(xml.iter('UserImage'));fc=image.find('FileContent');blocks=[base64.b64decode(b.get('Base64')) for b in fc]
     assert len(blocks)==int(fc.get('Size')) and all(len(b)==1024 for b in blocks[:-1])
-    png=b''.join(blocks);assert png==z.read('WadePluginUpdater/WadePluginUpdater.png')
+    png=b''.join(blocks);assert png==z.read(up['folder']+'/'+up['name']+'.png')
     assert int.from_bytes(png[16:20],'big')==300 and int.from_bytes(png[20:24],'big')==300
     assert png[25]==2,'Pool image must be RGB'
 print(f'Validated {len(rows)} archives, release manifests, embedded updater image, and {count} website pages.')
-lua=shutil.which('texlua') or shutil.which('lua')
-if not lua:raise SystemExit('Lua interpreter unavailable; runtime tests were not run.')
+lua=os.environ.get('WLT_LUA55') or shutil.which('lua5.5') or shutil.which('lua')
+if not lua:raise SystemExit('Lua 5.5 is required. Set WLT_LUA55 to the Lua 5.5 executable.')
+subprocess.run([lua,'-e','assert(_VERSION == "Lua 5.5", "MA3 2.5 validation requires Lua 5.5")'],check=True)
+with tempfile.TemporaryDirectory(prefix='wlt-compile-') as directory:
+    with zipfile.ZipFile(ROOT/'releases'/up['archive']) as z:
+        main=z.read(up['folder']+'/'+up['name']+'.lua')
+    release=Path(directory)/'release.lua';release.write_bytes(main)
+    subprocess.run([lua,'tests/release_startup.lua',str(release)],cwd=ROOT,check=True)
 for test in ('tests/core.lua','tests/runtime.lua','tests/updater_ui.lua','tests/hippo_remote.lua'):
     subprocess.run([lua,test],cwd=ROOT,check=True)

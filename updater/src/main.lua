@@ -1,5 +1,5 @@
 -- Native MA3 table UI. Every action is staged for review before file/show changes.
-local VERSION='1.1.4'
+local VERSION='1.1.5'
 local ui={actions={},busy=false,tab=1,cells={},activity={}}
 local R,build,scan
 local function valid(h) return h and safe(function()return IsObjectValid(h)end,false) end
@@ -31,7 +31,10 @@ end
 local function errorbox(err) MessageBox({title='WLT Plugin Updator',message=tostring(err),commands={{value=1,name='OK'}}}) end
 local function guarded(fn)
  if ui.busy then return end
- local ok,err=pcall(fn);if not ok then ui.busy=false;errorbox(err) end
+ local ok,err=pcall(fn);if not ok then
+  if ui.progress then safe(function()StopProgress(ui.progress)end);ui.progress=nil end
+  remove(ui.updateBase);ui.updateBase=nil;ui.busy=false;errorbox(err)
+ end
 end
 local function available_display(i)
  local d=safe(function()return GetDisplayByIndex(i)end,nil)
@@ -70,7 +73,7 @@ end
 local function pluginPage(p)
  return 'https://tmoose95.github.io/WadeLightingTools/'..p.id..'/'
 end
-local ACTIONS={[0]='Do Nothing',[1]='Import Online',[2]='Download to Drives',[3]='Import from Drive'}
+local ACTIONS={[0]='Do Nothing',[1]='Update Drives + Showfile',[2]='Download to Drives',[3]='Import from Drive'}
 local function updateActions()
  local count=0
  for id,mode in pairs(ui.actions)do if mode>0 then count=count+1 end end
@@ -97,13 +100,14 @@ local function drawUpdate()
  remove(ui.updateBase);ui.activity={};ui.activityLabels={}
  local d=ui.display;local face,green=colors()
  local b=d.ScreenOverlay:Append('BaseInput');ui.updateBase=b
- b.Name='WLTUpdating';b.W=math.min(1100,d.W*.94);b.H=350;b.Columns=1;b.Rows=6;b.AutoClose='No';b.CloseOnEscape='No'
+ local width=math.min(1100,tonumber(d.W)*.94)
+ b.Name='WLTUpdating';b.W=width;b.H=350;b.Columns=1;b.Rows=6;b.AutoClose='No';b.CloseOnEscape='No'
  for i,h in ipairs({50,64,42,26,108,60})do b[1][i].SizePolicy='Fixed';b[1][i].Size=tostring(h)end
  local title=b:Append('TitleBar');title.Anchors='0,0';title.Columns=1;title.Rows=1
  local cap=title:Append('TitleButton');cap.Anchors='0,0';cap.Text='WLT Plugin Updator - Updating';cap.Texture='corner1'
  ui.updateStatus=label(b,0,1,'Starting update...','Regular18')
  local track=grid(b,'UpdateProgress',1,1,'0,2');track.BackColor=face;track.Margin={left=12,right=12,top=4,bottom=4}
- ui.trackWidth=b.W-24
+ ui.trackWidth=width-24
  ui.fill=track:Append('UIObject');ui.fill.Name='UpdateProgressFill';ui.fill.Anchors='0,0';ui.fill.AlignmentH='Left';ui.fill.W=0;ui.fill.Visible='No';ui.fill.BackColor=green
  ui.percent=label(track,0,0,'0%','Regular18');ui.percent.Name='UpdatePercent';ui.percent.TextalignmentH='Centre'
  local heading=label(b,0,3,'System Monitor - latest messages','Regular16');heading.Name='UpdateLogHeading'
@@ -140,10 +144,10 @@ signalTable.WLTAction=function(c)guarded(function()
  local p=findPlugin(c.Name,'Action_');if not p then return end
  local commands={{value=0,name='Do Nothing'}}
  if R.online then
-  if p.id~='WadePluginUpdater' then commands[#commands+1]={value=1,name='Import Online'}end
+  commands[#commands+1]={value=1,name='Update Drives + Showfile'}
   commands[#commands+1]={value=2,name='Download to Drives'}
  end
- if R.localSource(p) and p.id~='WadePluginUpdater' then commands[#commands+1]={value=3,name='Import from Drive'}end
+ if R.localSource(p) then commands[#commands+1]={value=3,name='Import from Drive'}end
  local a=MessageBox({title=p.name..' - Action',message='Choose an action. Press Update to review and apply the queued actions.',commands=commands})
  if a and a.success and ACTIONS[a.result]then ui.actions[p.id]=a.result;updateActions()end
 end)end
@@ -157,7 +161,7 @@ signalTable.WLTBulk=function()guarded(function()
     local behind=false;for _,x in ipairs(R.installed[p.id] or {})do if R.versionStateFor(p,x.version)=='outdated'then behind=true end end
     local localCopy=R.localSource(p)
     if behind or (ui.tab==2 and localCopy and R.versionStateFor(p,localCopy.version)=='outdated')then
-     ui.actions[p.id]=(p.id=='WadePluginUpdater' or ui.tab==2)and 2 or 1
+     ui.actions[p.id]=ui.tab==2 and 2 or 1
     end
    end
   end
@@ -204,7 +208,8 @@ signalTable.WLTQR=function(c)guarded(function()
  end
  remove(ui.qrBase)
  local display=ui.display;local base=display.ScreenOverlay:Append('BaseInput');ui.qrBase=base
- base.Name='WLTPluginPage';base.W=math.min(660,display.W*.94);base.H=math.min(560,display.H*.94)
+ local width,height=math.min(660,tonumber(display.W)*.94),math.min(560,tonumber(display.H)*.94)
+ base.Name='WLTPluginPage';base.W=width;base.H=height
  base.Columns=1;base.Rows=4;base.AutoClose='No';base.CloseOnEscape='Yes'
  for i,h in ipairs({50,0,76,50})do base[1][i].SizePolicy=i==2 and 'Stretch' or 'Fixed';if i~=2 then base[1][i].Size=tostring(h)end end
  local title=base:Append('TitleBar');title.Anchors='0,0';title.Columns=2;title.Rows=1
@@ -214,13 +219,13 @@ signalTable.WLTQR=function(c)guarded(function()
  local qr=base:Append('QRCode');qr.Name='PluginPageQR';qr.Anchors='0,1';qr.Text=url
  qr.ShowText='No';qr.Title='';qr.Icon='';qr.Margin={left=22,right=22,top=16,bottom=16}
  -- Native QRCode renders a square, including its quiet zone, at this size.
- local size=math.max(72,math.min(340,base.W-44,base.H-208));qr.W=size;qr.H=size;qr.AlignmentH='Centre';qr.AlignmentV='Centre'
+ local size=math.max(72,math.min(340,width-44,height-208));qr.W=size;qr.H=size;qr.AlignmentH='Centre';qr.AlignmentV='Centre'
  local text=label(base,0,2,'Scan to open the plugin page on your phone.\n'..url,'Regular16');text.Name='PluginPageURL';text.TextalignmentH='Centre'
  button(base,0,3,'CloseQR','Close','WLTCloseQR')
 end)end
 signalTable.WLTHelp=function(c)guarded(function()
  local p=findPlugin(c.Name,'Help_');if not p then return end
- MessageBox({title=p.name..' - Help',message='Import Online downloads and imports the latest release. Download to Drives writes the package without changing show plugins. Import from Drive uses a complete local package.\n\nGreen = matches latest. Red = differs from latest. Grey = unknown or catalog unavailable. A newer installed version is never downgraded.\n\n'..(p.id=='WadePluginUpdater' and 'Close the updater before importing its downloaded XML manually.\n\n' or '')..'Plugin instructions: https://tmoose95.github.io/WadeLightingTools/'..p.id..'/',commands={{value=1,name='Close'}}})
+ MessageBox({title=p.name..' - Help',message='Update Drives + Showfile downloads the latest release to selected drives and imports it into the chosen showfile DataPools. Download to Drives writes the package without changing show plugins. Import from Drive uses a complete local package.\n\nGreen = matches latest. Red = differs from latest. Grey = unknown or catalog unavailable. A newer installed version is never downgraded.\n\n'..(p.id=='WadePluginUpdater' and 'The updater finishes last and closes its window automatically while updating its showfile slots. Reopen it when the result appears.\n\n' or '')..'Plugin instructions: https://tmoose95.github.io/WadeLightingTools/'..p.id..'/',commands={{value=1,name='Close'}}})
 end)end
 signalTable.WLTDetails=function()guarded(function()
  local lines={'Online catalog: '..(R.online and 'Loaded' or 'Unavailable'),
@@ -243,9 +248,12 @@ signalTable.WLTUpdate=function()guarded(function()
  if not a or not a.success or a.result~=1 then return end
  ui.busy=true;R.cancel=false;ui.exitAfterCancel=false;drawUpdate();ui.progress=StartProgress('WLT Plugin Updator | Updating')
  notify('Starting update',0,1000,true);R.pause(.01)
- local ok,result=pcall(R.run,plan)
+ local ok,result,handoff=pcall(R.run,plan)
  if not ok then notify(tostring(result),nil,nil,true) end
  StopProgress(ui.progress);ui.progress=nil;ui.busy=false;remove(ui.updateBase);ui.updateBase=nil
+ if ok and handoff and not R.cancel then
+  ui.actions={};close();CmdIndirect(handoff.command);return
+ end
  MessageBox({title=ok and 'Update results' or 'Update stopped',message=tostring(result),commands={{value=1,name='Close'}}})
  ui.actions={}
  if ui.exitAfterCancel then close();return end
@@ -331,7 +339,7 @@ build=function(display)
 end
 local function metadata()
  safe(function()
-  local p=myHandle:Parent();local appearance=Root().ShowData.Appearances.PluginUpdator_1_1_4
+  local p=myHandle:Parent();local appearance=Root().ShowData.Appearances.PluginUpdator_1_1_5
   if appearance then p.Appearance=appearance end
   local tag
   for _,t in ipairs(ObjectList('Tag Thru')or{})do if R.prop(t,'Name')=='Utility Plugins'then tag=t;break end end
@@ -346,7 +354,7 @@ return function()
  if old then remove(old.qrBase);remove(old.chooser);remove(old.scanBase);remove(old.updateBase);remove(old.base)end
  _G.__WadeLightingToolsWindow=ui;ui.busy=true;ui.actions={}
  local ok,why=pcall(function()
-  R=Runtime(Core,Transport,BOOTSTRAP,notify,myHandle:Parent(),TRUST_BUNDLE)
+  R=Runtime(Core,Transport,BOOTSTRAP,notify,myHandle:Parent(),TRUST_BUNDLE,SELF_UPDATE_FACTORY)
   R.allPools=true
   ui.display=GetFocusDisplay()or GetDisplayByIndex(1)
   metadata();scan(true)

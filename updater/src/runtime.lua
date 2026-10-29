@@ -1,4 +1,4 @@
-return function(Core,Transport,bootstrap,notify,plugin,trustBundle)
+return function(Core,Transport,bootstrap,notify,plugin,trustBundle,selfUpdateFactory)
  local R={catalog=Core.catalog(bootstrap),drives={},localFiles={},installed={},selectedDrives={},cancel=false,mode=1,online=false,issues={},allPools=false,localChoice={},showInstalled={}}
  local function safe(fn,other) local ok,v=pcall(fn);if ok then return v end;return other end
  local function prop(h,n)
@@ -286,7 +286,10 @@ return function(Core,Transport,bootstrap,notify,plugin,trustBundle)
    end
    local installed=R.installed[p.id] or {}
    if mode~=2 then
-    assert(p.id~='WadePluginUpdater','Download the updater, then import it manually after closing this window')
+    if p.id=='WadePluginUpdater' then
+     assert(type(selfUpdateFactory)=='function' and type(CmdIndirect)=='function' and type(Timer)=='function',
+      'This station cannot start the updater handoff')
+    end
     local runtime=tostring(Version()):match('(%d+%.%d+%.%d+%.?%d*)')
     assert(runtime and (Core.compare(runtime,p.minimum) or -1)>=0,'This release requires MA3 '..p.minimum)
     for _,x in ipairs(installed) do
@@ -310,8 +313,15 @@ return function(Core,Transport,bootstrap,notify,plugin,trustBundle)
    end
    plan.items[#plan.items+1]={plugin=p,source=source,version=v,slots=slots,mode=mode}
    local target={};for _,x in ipairs(slots) do target[#target+1]='DataPool '..x.poolNumber..' / Plugin '..x.slot end
-   local action=mode==1 and 'Import Online' or (mode==2 and 'Download to Drives' or 'Import from Drive')
+   local action=mode==1 and 'Update Drives + Showfile' or (mode==2 and 'Download to Drives' or 'Import from Drive')
    plan.lines[#plan.lines+1]=p.name..' '..v..' - '..action..(mode~=2 and (' -> '..table.concat(target,', ')) or '')
+   if p.id=='WadePluginUpdater' and mode~=2 then
+    plan.lines[#plan.lines+1]='The updater will finish last and close its window while its showfile slots are updated automatically.'
+   end
+  end end
+  -- Finish other reviewed actions before handing off the running updater.
+  for i,item in ipairs(plan.items)do if item.plugin.id=='WadePluginUpdater' and item.mode~=2 then
+   table.remove(plan.items,i);plan.items[#plan.items+1]=item;break
   end end
   assert(#plan.items>0,'Choose an action for one or more plugins');return plan
  end
@@ -419,7 +429,7 @@ return function(Core,Transport,bootstrap,notify,plugin,trustBundle)
   report('Show plugin backup: '..path)
   slot.backup=path
  end
- local function install(item,source,plan)
+ local function install(item,source,plan,previousResults)
   validateLocal(source,item.plugin)
   local original=assert(read(source.path,16777216),'Import XML no longer exists')
   local embedded,expectedCodes=Core.embeddedPlugin(original,function(f)return read(join(source.folder,f))end,pulse)
@@ -442,6 +452,21 @@ return function(Core,Transport,bootstrap,notify,plugin,trustBundle)
   if #repairs>0 then
    local choice=MessageBox({title='Repair empty plugin component',message=item.plugin.name..' has an empty Lua component in the existing showfile export. Its damaged state has been saved, but that snapshot cannot restore working code.\n\n'..table.concat(repairs,'\n\n')..'\n\nThe replacement package has been read and its Lua compiled. Repair these slots from version '..item.version..'?',commands={{value=1,name='Repair from verified package'},{value=0,name='Cancel'}}})
    assert(choice and choice.success and choice.result==1,'Repair cancelled; existing show slots were not changed')
+  end
+  if item.plugin.id=='WadePluginUpdater' then
+   local job={folder=importFolder,xml=importName,digest=Core.sha256(embedded,pulse),version=item.version,
+    plugin=item.plugin,slots={},previous=table.concat(previousResults or {},'\n'),start=progress.value}
+   for _,slot in ipairs(item.slots) do
+    job.slots[#job.slots+1]={pool=slot.poolNumber,poolHandle=HandleToStr(slot.pool),slot=slot.slot,
+     handle=slot.handle and HandleToStr(slot.handle) or nil,meta=slot.handle and pluginMeta(slot.handle) or nil,backup=slot.backup}
+   end
+   local path=join(importFolder,'FinishUpdate.lua')
+   assert(not path:find('["\r\n]'),'Unsupported characters in updater workspace path')
+   local script=selfUpdateFactory(job)
+   assert(load(script,'@FinishUpdate.lua','t',{}),'Updater handoff does not compile')
+   assert(write(path,script) and read(path,16777216)==script,'Updater handoff write/readback failed')
+   report('Drive files ready. Finishing updater showfile update...')
+   return {command='LuaFile "'..path..'"',path=path}
   end
   for slotIndex,slot in ipairs(item.slots) do
    local function step(n) advance(.1+.9*((slotIndex-1)+n)/#item.slots) end
@@ -498,7 +523,7 @@ return function(Core,Transport,bootstrap,notify,plugin,trustBundle)
   R.localFiles[p.id]=a;R.localChoice[p.id]=nil
  end
  function R.run(plan)
-  R.cancel=false;local results={};local completed=0
+  R.cancel=false;local results={};local completed=0;local handoff
   progress={item=1,count=#plan.items,start=0,span=0,value=0,text='Starting update'}
   report('Starting update',0,1000)
   for itemIndex,item in ipairs(plan.items) do
@@ -523,18 +548,18 @@ return function(Core,Transport,bootstrap,notify,plugin,trustBundle)
      end
      source=sources[1]
     end
-    if item.mode~=2 then phase(item.mode==3 and .2 or .8,1,'Preparing import: '..item.plugin.name);install(item,source,plan) end
+    if item.mode~=2 then phase(item.mode==3 and .2 or .8,1,'Preparing import: '..item.plugin.name);handoff=install(item,source,plan,results) end
    end)
-   results[#results+1]=(ok and 'OK: ' or 'FAILED: ')..item.plugin.name..(ok and '' or (' - '..tostring(why)))
+   results[#results+1]=(ok and (handoff and 'READY: ' or 'OK: ') or 'FAILED: ')..item.plugin.name..(ok and '' or (' - '..tostring(why)))
    if not ok then issue(results[#results]);break end -- Stop batch after first partial/failure.
    completed=completed+1
   end
   R.refreshInstalled()
-  if completed==#plan.items and not R.cancel then
+  if completed==#plan.items and not R.cancel and not handoff then
    progress.value=1;report('Update complete - all selected actions verified')
-  elseif R.cancel then report('Update cancelled') end
+  elseif R.cancel then handoff=nil;report('Update cancelled') end
   progress=nil
-  return table.concat(results,'\n')
+  return table.concat(results,'\n'),handoff
  end
  R.pool=DataPool()
  R.scanFolders=scanFolders

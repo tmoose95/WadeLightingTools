@@ -1,61 +1,56 @@
-WLT PLUGIN UPDATOR v1.1.6
+WLT PLUGIN UPDATOR v1.1.7
 Aaron Wade - Crossfade Design
 Target: grandMA3 2.5.1.0 and later 2.5 releases
 
-CONTAINMENT RELEASE - SHOWFILE IMPORTS PAUSED
-The user reported that Import from Drive in v1.1.5 restarted the console for
-all attempted plugin targets. The shared native import path is a suspect;
-the exact crash cause has NOT been established. Automated tests of mocked MA
-objects did not detect this native-console failure.
+TAB ACTIONS
+Showfile: Import from Drive, Import from Internet, Do Nothing.
+  Both import choices remain visible, labelled paused. Selecting one explains
+  the temporary restriction and does not change a pool object.
+Drives: Download from Internet, Do Nothing.
+  This updates selected drive packages from the verified online release.
+More Plugins: plugin QR pages, Download from Internet, and a paused Import
+  from Internet choice. Action queues are separate for each tab.
 
-Both Update Drives + Showfile and Import from Drive are disabled in this
-release, including updater self replacement. Download to Drives remains.
-The runtime rejects both import modes before any batch operation. The released
-Lua contains no native object Import call and no self-update LuaFile worker.
-This contains the affected operation; it is not a native import repair.
-Do not retry the affected import action on a production console.
+CONSOLE RESTART INVESTIGATION
+A restart was reported when starting an import through v1.1.5. The supplied
+log records a native memory-access fault but no updater Starting update or
+import message immediately beforehand. It does not establish the cause.
+The update popup previously embedded an unverified native System Monitor
+window before running the update. That widget has been removed. This change
+is a precaution, NOT a confirmed fix. The last three updater messages are
+now shown as ordinary labels; this is not the full System Monitor stream.
+
+Automated showfile imports and self replacement remain blocked. The released
+Lua has no native object Import call and no self-update LuaFile worker.
+Do not retry the affected updater import action on a production console.
+Native MA3 testing is still needed before imports can be enabled again.
 
 INSTALL
-Close v1.1.5. Extract this ZIP and copy its WLT Plugin Updator folder into
-USB:/grandMA3/gma3_library/datapools/plugins/.
+Close the old updater. Extract this ZIP and copy its WLT Plugin Updator folder
+into USB:/grandMA3/gma3_library/datapools/plugins/.
 When programming can be interrupted, use MA3's normal plugin editor to import
-WLT Plugin Updator_v1.1.6.xml into the updater slot. Do not use v1.1.5's import
+WLT Plugin Updator_v1.1.7.xml. Do not use an older updater's automated import
 actions to install this revision. The green 300 x 300 RGB icon is unchanged.
 
 AVAILABLE WORKFLOW
-- Startup scans the current internal plugin library and connected removable
-  USB plugin libraries. Without USB, only the internal library is scanned.
-  Old software/remote drives, show folders and unrelated files are skipped.
-- Showfile, USB Drives and More Plugins tabs compare versions. Green matches
-  the live catalog, red differs, grey is unknown or unavailable.
-- Choose Download to Drives or Do Nothing for each row. The Action heading
-  selects available downloads or clears the queue. Update reviews the drives
-  and packages before downloading. No showfile plugin code is imported.
-- Downloads verify HTTPS, SHA-256 and byte counts; staged files are read back
+- Startup scans current internal and connected removable USB plugin libraries.
+  With no USB, only the internal library is scanned. Old software/remote drives,
+  show folders, backups and unrelated files are skipped.
+- Drives lists packages on selected internal and USB drives.
+- Green versions match the live catalog; red differs; grey means unavailable.
+- Downloads verify HTTPS, SHA-256 and byte counts. Staged files are read back
   before promotion. Existing drive folders remain in backups. ZIPs are kept
   under WadeLightingToolsData/downloads. Newer local packages are protected.
-- The bar and percentage reflect bytes and completed download/write checks.
-  The native System Monitor viewport remains; where unsupported, three labelled
-  updater log lines are shown. Cancel stops further work.
-- QR Code opens the plugin's own GitHub page in a native QR widget. Settings
-  provides drives, rescan and connection details. Move-screen controls remain.
-- The Showfile import paused control explains the temporary restriction.
-
-DIAGNOSTICS - NO REPRODUCTION REQUIRED
-Use ListCrashLog to list existing crash entries. CopyCrashLog copies existing
-crash logs to USB; do not add /Remove. DumpLog exports current System Monitor
-text. Preserve the failed import's time, console software version and target.
-The native crash log may require MA support to decode it.
-Official references:
-https://help.malighting.com/grandMA3/2.5/HTML/keyword_copycrashlog.html
-https://help.malighting.com/grandMA3/2.5/HTML/keyword_dumplog.html
+- Bar and percentage follow downloaded bytes and completed write/verify steps.
+  Three activity labels show recent updater messages. Cancel stops further work.
+- QR Code links to the plugin's own GitHub page. Settings provides drives,
+  rescan and connection details. Move-screen controls remain.
 
 VERIFICATION LIMIT
-Automated tests verify import rejection, download behavior, startup/UI,
-checksums, packaging and local TLS. They do not execute grandMA3.
-The supplied grandMA3.app is macOS 2.4.2.2 and cannot run on this Linux host.
-No successful native console/onPC import is claimed. The intended combined
-showfile-and-drive workflow remains pending native diagnosis and validation.
+Automated tests cover menu separation, import rejection, downloads, progress,
+startup, checksums, packaging and local TLS. They do not execute grandMA3.
+The supplied app is macOS 2.4.2.2 and cannot run on this Linux build host.
+No native console/onPC stability or successful import is claimed.
 
 Independent WLT implementation. No MATools code, account service or branding.
 Certificate attribution is in CA-LICENSE.txt.

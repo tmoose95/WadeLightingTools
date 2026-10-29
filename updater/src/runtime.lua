@@ -1,5 +1,7 @@
 return function(Core,Transport,bootstrap,notify,plugin,trustBundle,selfUpdateFactory)
- local R={catalog=Core.catalog(bootstrap),drives={},localFiles={},installed={},selectedDrives={},cancel=false,mode=1,online=false,issues={},allPools=false,localChoice={},showInstalled={}}
+ local R={catalog=Core.catalog(bootstrap),drives={},localFiles={},installed={},selectedDrives={},cancel=false,mode=2,online=false,issues={},allPools=false,localChoice={},showInstalled={}}
+ local IMPORT_PAUSED='Showfile import is temporarily disabled after a reported console restart. Download to Drives remains available. The native import cause is not yet confirmed.'
+ R.importNotice=IMPORT_PAUSED
  local function safe(fn,other) local ok,v=pcall(fn);if ok then return v end;return other end
  local function prop(h,n)
   if not h then return '' end
@@ -264,7 +266,7 @@ return function(Core,Transport,bootstrap,notify,plugin,trustBundle,selfUpdateFac
   end
   for _,p in ipairs(R.catalog) do if selected[p.id] and selected[p.id]~=0 then
    local mode=type(selected[p.id])=='number' and selected[p.id] or R.mode
-   assert(mode==1 or mode==2 or mode==3,'Unknown row action')
+   assert(mode==2,IMPORT_PAUSED)
    local source=mode==3 and R.localSource(p) or nil
    assert(mode==3 or R.online,'Online catalog is unavailable. Choose Import from Drive for a local copy.')
    assert(mode~=3 or source,'No complete local package on a selected drive: '..p.name)
@@ -429,90 +431,8 @@ return function(Core,Transport,bootstrap,notify,plugin,trustBundle,selfUpdateFac
   report('Show plugin backup: '..path)
   slot.backup=path
  end
- local function install(item,source,plan,previousResults)
-  validateLocal(source,item.plugin)
-  local original=assert(read(source.path,16777216),'Import XML no longer exists')
-  local embedded,expectedCodes=Core.embeddedPlugin(original,function(f)return read(join(source.folder,f))end,pulse)
-  local importFolder=join(work,'import_'..unique())
-  assert(mkdir(importFolder),'Cannot create self-contained import workspace')
-  local importName='Plugin.xml'
-  assert(write(join(importFolder,importName),embedded),'Could not write self-contained import XML')
-  assert(read(join(importFolder,importName),16777216)==embedded,'Import XML readback differs')
-  assert(valid(plan.pool) and index(plan.pool)==plan.poolNumber,'Destination DataPool changed')
-  advance(.1,'Preparing verified import: '..item.plugin.name)
-  local repairs={}
-  for _,slot in ipairs(item.slots) do
-   assert(valid(slot.pool) and index(slot.pool)==slot.poolNumber,'Destination DataPool changed')
-   local current=slot.pool.Plugins[slot.slot]
-   if slot.handle then assert(current==slot.handle,'Plugin slot changed after review')
-   else assert(not valid(current),'New plugin slot is now occupied') end
-   if not slot.backup then backupSlot(item,slot) end
-   if slot.incomplete then repairs[#repairs+1]='DataPool '..slot.poolNumber..' / Plugin '..slot.slot..': '..slot.incomplete..'\nSnapshot: '..slot.backup end
-  end
-  if #repairs>0 then
-   local choice=MessageBox({title='Repair empty plugin component',message=item.plugin.name..' has an empty Lua component in the existing showfile export. Its damaged state has been saved, but that snapshot cannot restore working code.\n\n'..table.concat(repairs,'\n\n')..'\n\nThe replacement package has been read and its Lua compiled. Repair these slots from version '..item.version..'?',commands={{value=1,name='Repair from verified package'},{value=0,name='Cancel'}}})
-   assert(choice and choice.success and choice.result==1,'Repair cancelled; existing show slots were not changed')
-  end
-  if item.plugin.id=='WadePluginUpdater' then
-   local job={folder=importFolder,xml=importName,digest=Core.sha256(embedded,pulse),version=item.version,
-    plugin=item.plugin,slots={},previous=table.concat(previousResults or {},'\n'),start=progress.value}
-   for _,slot in ipairs(item.slots) do
-    job.slots[#job.slots+1]={pool=slot.poolNumber,poolHandle=HandleToStr(slot.pool),slot=slot.slot,
-     handle=slot.handle and HandleToStr(slot.handle) or nil,meta=slot.handle and pluginMeta(slot.handle) or nil,backup=slot.backup}
-   end
-   local path=join(importFolder,'FinishUpdate.lua')
-   assert(not path:find('["\r\n]'),'Unsupported characters in updater workspace path')
-   local script=selfUpdateFactory(job)
-   assert(load(script,'@FinishUpdate.lua','t',{}),'Updater handoff does not compile')
-   assert(write(path,script) and read(path,16777216)==script,'Updater handoff write/readback failed')
-   report('Drive files ready. Finishing updater showfile update...')
-   return {command='LuaFile "'..path..'"',path=path}
-  end
-  for slotIndex,slot in ipairs(item.slots) do
-   local function step(n) advance(.1+.9*((slotIndex-1)+n)/#item.slots) end
-   pulse();assertDrive(source.drive)
-   local target=slot.pool.Plugins[slot.slot]
-   if not slot.handle then
-    checked('Store DataPool '..slot.poolNumber..' Plugin '..slot.slot..' /NoConfirmation')
-    target=slot.pool.Plugins[slot.slot]
-   end
-   local where='DataPool '..slot.poolNumber..' / Plugin '..slot.slot
-   local recovery=' Backup: '..tostring(slot.backup or 'new slot')
-   assert(valid(target),'Could not create import target at '..where..recovery)
-   report('Importing '..item.plugin.name..' into '..where)
-   -- The object API can resolve external FileName against lib_plugins instead
-   -- of this USB/library folder. Import verified embedded FileContent instead.
-   assert(target:Import(importFolder,importName),
-    'Native object import failed at '..where..' from '..join(importFolder,importName)..recovery)
-   step(.45)
-   local untilTime=now()+3;local found
-   repeat
-    pause(.05);found=slot.pool.Plugins[slot.slot]
-    if valid(found) and Core.compare(prop(found,'Version'),item.version)==0 then break end
-   until now()>=untilTime
-   local actual=pluginMeta(found)
-   assert(valid(found) and Core.matches(actual,item.plugin) and Core.compare(actual.Version,item.version)==0,
-    'Imported metadata differs at '..where..': expected '..item.plugin.name..' '..item.version..
-    '; found '..actual.Name..' '..actual.Version..' / Author '..actual.Author..' / Path '..actual.Path..recovery)
-   -- A version alone cannot prove that the Lua component was replaced.
-   local check=join(work,'verify_'..unique())
-   report('Checking imported Lua: '..item.plugin.name..' / '..where);step(.6)
-   assert(mkdir(check),'Cannot create import verification folder'..recovery)
-   assert(found:Export(check,'Plugin.xml'),'Cannot verify imported Lua at '..where..recovery)
-   local exportedXML=read(join(check,'Plugin.xml'),16777216)
-   local exported=assert(Core.xml(exportedXML),'Imported export could not be read'..recovery)
-   local actualCodes=Core.luaContents(exportedXML,function(f)
-    return read(join(check,f)) or read(join(join(check,(exported.Path or ''):gsub('^/','')),f))
-   end)
-   assert(#actualCodes==#expectedCodes,'Imported Lua component count differs at '..where..recovery)
-   local function normal(s) return s and s:gsub('\r\n','\n'):gsub('\n+$','') end
-   for i,expected in ipairs(expectedCodes) do
-    assert(normal(actualCodes[i])==normal(expected),
-     'Imported Lua did not match component '..i..' at '..where..recovery)
-   end
-   report('Installed '..item.plugin.name..' '..item.version..' at Plugin '..slot.slot)
-   step(1)
-  end
+ local function install()
+  error(IMPORT_PAUSED)
  end
  local function remember(p,entry)
   local a={}
@@ -523,6 +443,8 @@ return function(Core,Transport,bootstrap,notify,plugin,trustBundle,selfUpdateFac
   R.localFiles[p.id]=a;R.localChoice[p.id]=nil
  end
  function R.run(plan)
+  -- Validate the entire batch before progress, backup, download or pool changes.
+  for _,item in ipairs(plan.items or {})do assert(item.mode==2,IMPORT_PAUSED)end
   R.cancel=false;local results={};local completed=0;local handoff
   progress={item=1,count=#plan.items,start=0,span=0,value=0,text='Starting update'}
   report('Starting update',0,1000)

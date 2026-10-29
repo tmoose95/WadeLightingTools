@@ -1,5 +1,5 @@
 -- Native MA3 table UI. Every action is staged for review before file/show changes.
-local VERSION='1.1.5'
+local VERSION='1.1.6'
 local ui={actions={},busy=false,tab=1,cells={},activity={}}
 local R,build,scan
 local function valid(h) return h and safe(function()return IsObjectValid(h)end,false) end
@@ -73,7 +73,7 @@ end
 local function pluginPage(p)
  return 'https://tmoose95.github.io/WadeLightingTools/'..p.id..'/'
 end
-local ACTIONS={[0]='Do Nothing',[1]='Update Drives + Showfile',[2]='Download to Drives',[3]='Import from Drive'}
+local ACTIONS={[0]='Do Nothing',[2]='Download to Drives'}
 local function updateActions()
  local count=0
  for id,mode in pairs(ui.actions)do if mode>0 then count=count+1 end end
@@ -144,11 +144,9 @@ signalTable.WLTAction=function(c)guarded(function()
  local p=findPlugin(c.Name,'Action_');if not p then return end
  local commands={{value=0,name='Do Nothing'}}
  if R.online then
-  commands[#commands+1]={value=1,name='Update Drives + Showfile'}
   commands[#commands+1]={value=2,name='Download to Drives'}
  end
- if R.localSource(p) then commands[#commands+1]={value=3,name='Import from Drive'}end
- local a=MessageBox({title=p.name..' - Action',message='Choose an action. Press Update to review and apply the queued actions.',commands=commands})
+ local a=MessageBox({title=p.name..' - Action',message=R.importNotice..'\n\nChoose Download to Drives, then Update to review the downloads.',commands=commands})
  if a and a.success and ACTIONS[a.result]then ui.actions[p.id]=a.result;updateActions()end
 end)end
 signalTable.WLTBulk=function()guarded(function()
@@ -161,7 +159,7 @@ signalTable.WLTBulk=function()guarded(function()
     local behind=false;for _,x in ipairs(R.installed[p.id] or {})do if R.versionStateFor(p,x.version)=='outdated'then behind=true end end
     local localCopy=R.localSource(p)
     if behind or (ui.tab==2 and localCopy and R.versionStateFor(p,localCopy.version)=='outdated')then
-     ui.actions[p.id]=ui.tab==2 and 2 or 1
+     ui.actions[p.id]=2
     end
    end
   end
@@ -170,20 +168,14 @@ signalTable.WLTBulk=function()guarded(function()
 end)end
 signalTable.WLTDrives=function()guarded(function()
  local states={};for _,d in ipairs(R.drives)do states[#states+1]={name=d.label,state=R.selectedDrives[d.path] or false}end
- local a=MessageBox({title='Download / source drives',message='Downloads go to every selected drive. Import from Drive uses the chosen complete package on a selected drive.',states=states,commands={{value=1,name='Apply'},{value=0,name='Cancel'}}})
+ local a=MessageBox({title='Download / source drives',message='Downloads go to every selected drive. Showfile imports are temporarily disabled.',states=states,commands={{value=1,name='Apply'},{value=0,name='Cancel'}}})
  if a and a.success and a.result==1 then
   R.selectedDrives={};for _,d in ipairs(R.drives)do if a.states and a.states[d.label]then R.selectedDrives[d.path]=true end end
   build(ui.display)
  end
 end)end
 signalTable.WLTPool=function()guarded(function()
- local commands={{value=-1,name='All DataPools'},{value=0,name='Cancel'}};local lookup={}
- for _,p in ipairs(R.pools())do local n=R.index(p);commands[#commands+1]={value=n,name=n..' - '..R.prop(p,'Name')};lookup[n]=p end
- local a=MessageBox({title='Update Destination',message='Existing plugins retain their slots. A missing plugin uses an empty slot in each chosen DataPool. Review lists every target.',commands=commands})
- if a and a.success then
-  if a.result==-1 then R.allPools=true elseif lookup[a.result]then R.allPools=false;R.pool=lookup[a.result]else return end
-  R.refreshInstalled();build(ui.display)
- end
+ MessageBox({title='Showfile import paused',message=R.importNotice,commands={{value=1,name='Close'}}});return
 end)end
 signalTable.WLTUSB=function(c)guarded(function()
  local p=findPlugin(c.Name,'USB_');if not p then return end
@@ -225,7 +217,7 @@ signalTable.WLTQR=function(c)guarded(function()
 end)end
 signalTable.WLTHelp=function(c)guarded(function()
  local p=findPlugin(c.Name,'Help_');if not p then return end
- MessageBox({title=p.name..' - Help',message='Update Drives + Showfile downloads the latest release to selected drives and imports it into the chosen showfile DataPools. Download to Drives writes the package without changing show plugins. Import from Drive uses a complete local package.\n\nGreen = matches latest. Red = differs from latest. Grey = unknown or catalog unavailable. A newer installed version is never downgraded.\n\n'..(p.id=='WadePluginUpdater' and 'The updater finishes last and closes its window automatically while updating its showfile slots. Reopen it when the result appears.\n\n' or '')..'Plugin instructions: https://tmoose95.github.io/WadeLightingTools/'..p.id..'/',commands={{value=1,name='Close'}}})
+ MessageBox({title=p.name..' - Help',message=R.importNotice..'\n\nGreen = matches latest online version. Red = differs from latest. Grey = unknown or unavailable. Choose Download to Drives to save the verified package. Existing showfile objects are not updated.',commands={{value=1,name='Close'}}})
 end)end
 signalTable.WLTDetails=function()guarded(function()
  local lines={'Online catalog: '..(R.online and 'Loaded' or 'Unavailable'),
@@ -248,12 +240,9 @@ signalTable.WLTUpdate=function()guarded(function()
  if not a or not a.success or a.result~=1 then return end
  ui.busy=true;R.cancel=false;ui.exitAfterCancel=false;drawUpdate();ui.progress=StartProgress('WLT Plugin Updator | Updating')
  notify('Starting update',0,1000,true);R.pause(.01)
- local ok,result,handoff=pcall(R.run,plan)
+ local ok,result=pcall(R.run,plan)
  if not ok then notify(tostring(result),nil,nil,true) end
  StopProgress(ui.progress);ui.progress=nil;ui.busy=false;remove(ui.updateBase);ui.updateBase=nil
- if ok and handoff and not R.cancel then
-  ui.actions={};close();CmdIndirect(handoff.command);return
- end
  MessageBox({title=ok and 'Update results' or 'Update stopped',message=tostring(result),commands={{value=1,name='Close'}}})
  ui.actions={}
  if ui.exitAfterCancel then close();return end
@@ -288,7 +277,7 @@ build=function(display)
  local frame=base:Append('DialogFrame');frame.Columns=1;frame.Rows=6;frame.Anchors='0,1'
  for i,h in ipairs({66,54,40,0,54,58})do frame[1][i].SizePolicy=i==4 and 'Stretch' or 'Fixed';if i~=4 then frame[1][i].Size=tostring(h)end end
  local banner=grid(frame,'Banner',1,2,'0,0')
- local brand=label(banner,0,0,'WADE LT  |  Your plugins. Up to date.','Regular20');brand.TextalignmentH='Centre'
+ local brand=label(banner,0,0,'WADE LT  |  Downloads available - showfile imports paused','Regular20');brand.TextalignmentH='Centre'
  ui.status=label(banner,0,1,#R.drives..' drives scanned  |  '..(R.online and 'Online catalog loaded' or 'Online catalog unavailable - see Settings > Connection Details'));ui.status.TextalignmentH='Centre'
  local tabs=grid(frame,'Tabs',3,1,'0,1')
  for i,text in ipairs({'Plugins in your Showfile','Plugins on your USB Drives','More Plugins'})do
@@ -331,7 +320,7 @@ build=function(display)
  end
  local dest=grid(frame,'Destination',2,1,'0,4');dest[2][1].SizePolicy='Stretch';dest[2][1].Size='2';dest[2][2].SizePolicy='Stretch';dest[2][2].Size='5'
  button(dest,0,0,'Drives','Drives ('..#R.drivesSelected()..' selected)','WLTDrives',face)
- button(dest,1,0,'Pool','Update Destination:  '..(R.allPools and 'All DataPools' or R.prop(R.pool,'Name'))..'  ▾','WLTPool',face)
+ button(dest,1,0,'Pool','Showfile import paused - Info','WLTPool',face)
  local footer=grid(frame,'Footer',2,1,'0,5')
  button(footer,0,0,'Close','Close','WLTClose',face)
  ui.update=button(footer,1,0,'Update','Update','WLTUpdate',face)
@@ -339,7 +328,7 @@ build=function(display)
 end
 local function metadata()
  safe(function()
-  local p=myHandle:Parent();local appearance=Root().ShowData.Appearances.PluginUpdator_1_1_5
+  local p=myHandle:Parent();local appearance=Root().ShowData.Appearances.PluginUpdator_1_1_6
   if appearance then p.Appearance=appearance end
   local tag
   for _,t in ipairs(ObjectList('Tag Thru')or{})do if R.prop(t,'Name')=='Utility Plugins'then tag=t;break end end

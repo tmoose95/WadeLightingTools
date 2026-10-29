@@ -22,3 +22,11 @@
 ## First console check
 
 Use a copy of the show. Launch with two drives attached and confirm the drive scan completes before the main window appears. Select one plugin and Download Only to one USB drive, then Install Only into an empty test DataPool. Verify its version, pool image and operation. Next update an existing test slot and check the exported backup. Disconnect internet and confirm local copies remain available. Remove a selected drive before confirming an update and confirm the updater reports that the drive changed.
+
+## Plugin Updator 1.0.1
+
+- Updated display name and title, plus the 300 x 300 RGB pool image with Wade LT centered at the top.
+- New versioned image and appearance references avoid binding to the previous icon.
+- Stable catalog ID and plugin folder preserved for existing installations.
+- All 63 existing automated scenarios passed, including startup drive scanning.
+- Package XML metadata, embedded image bytes, and release checksums validated.

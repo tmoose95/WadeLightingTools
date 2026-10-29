@@ -5,7 +5,7 @@ grandMA3 plugins by Aaron Wade, with a static GitHub Pages catalog and an indepe
 ## Project layout
 
 - `docs/`: website and a subpage named for each plugin.
-- `releases/`: original latest revision ZIPs, plus Wade Plugin Updater.
+- `releases/`: original latest revision ZIPs, plus Plugin Updator.
 - `packages/`: immutable unpacked release files and SHA-256 manifests.
 - `catalog.tsv`: machine-readable internet update catalog.
 - `registry.json`: release metadata used to build the site.

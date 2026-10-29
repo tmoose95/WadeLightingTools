@@ -5,8 +5,8 @@ PLUGIN	AutoColorPicker	Auto Color Picker	5.0.3.0	2.5.1.0	AutoColorPicker	package
 PLUGIN	CueBeacon	Cue Beacon	1.0.0.0	2.5.1.0	Cue_Beacon_v1.0.0	packages/CueBeacon/1.0.0.0/manifest.tsv	04b54f4671a37ac9b0a1d9c69a91a07d0055474424358e77e175219168ad1652
 PLUGIN	HippoRemote	Hippo Remote	1.3.0	2.5.1.0	HippoRemote	packages/HippoRemote/1.3.0/manifest.tsv	a28fee7e9aba6de5a9bf091edd1c25c08a1d52ffec2f5673e0a5984a4141353b
 PLUGIN	MASearch	MA Search	0.3.9	2.5.1.0	MASearch	packages/MASearch/0.3.9/manifest.tsv	bf64c4af263576c0e497488b92663f8f0c131dbc316d258ea7c94e08c47d804e
+PLUGIN	WadePluginUpdater	Plugin Updator	1.0.1	2.5.1.0	WadePluginUpdater	packages/WadePluginUpdater/1.0.1/manifest.tsv	c441ebe7f225ef5fddd69e1057b733e9b09d802c3966498ab0839b276b6b0155
 PLUGIN	ServerCommand	Server Command	2.3.15	2.5.1.0	ServerCommand	packages/ServerCommand/2.3.15/manifest.tsv	b633ba49882f330544d0c52219554b2f46d05ae19a3437e8313fec2977b86a84
 PLUGIN	TouchConfigurator	Touch Configurator	1.0.41	2.5.1.0	TouchConfigurator	packages/TouchConfigurator/1.0.41/manifest.tsv	e86d264925104d9320e6f8b9dafe93c1913c9962f4bc6500b4ea9dc6f52d6f9d
 PLUGIN	TourLocation	Tour Location	1.0.10	2.5.1.0	TourLocation	packages/TourLocation/1.0.10/manifest.tsv	791b17e25287f88facd6aa3406867da99baa38b95cbd891dd8429db01d4b7b36
-PLUGIN	WadePluginUpdater	Wade Plugin Updater	1.0.0	2.5.1.0	WadePluginUpdater	packages/WadePluginUpdater/1.0.0/manifest.tsv	23df728ddc3f11a0f7fe521783bd8eb36f5dbd84290eacdd22fcd8a2bbdb0b29
 PLUGIN	WingConfigurator	Wing Configurator	1.0.28	2.5.1.0	WingConfigurator	packages/WingConfigurator/1.0.28/manifest.tsv	a8b62d7140487372373248d141b4541c608801ad94b117c6b8f1b3b4b439814a

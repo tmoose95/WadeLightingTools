@@ -94,6 +94,22 @@
     "summary": "Find DataPool objects and navigate to them through a dedicated search window."
   },
   {
+    "id": "WadePluginUpdater",
+    "name": "Plugin Updator",
+    "version": "1.0.1",
+    "folder": "WadePluginUpdater",
+    "archive": "PluginUpdator_v1.0.1.zip",
+    "minimum": "2.5.1.0",
+    "note": "Scan connected drives, compare installed/local/online versions, and download or install WadeLightingTools releases. Utility Plugins.",
+    "manifest": "packages/WadePluginUpdater/1.0.1/manifest.tsv",
+    "digest": "c441ebe7f225ef5fddd69e1057b733e9b09d802c3966498ab0839b276b6b0155",
+    "xml": "PluginUpdator_v1.0.1.xml",
+    "bytes": 179380,
+    "zip_sha256": "76d36d92e9e717716f2b071dab2b76f7ae033d9ce1cf44acf75bc0c8791b9f70",
+    "image": "WadePluginUpdater.png",
+    "summary": "Scan drives, compare versions, and download or install your Wade plugins."
+  },
+  {
     "id": "ServerCommand",
     "name": "Server Command",
     "version": "2.3.15",
@@ -140,22 +156,6 @@
     "zip_sha256": "71f45e873be2e5c0bdfd61b66400418d740508782195bfb506e95c5a16da5091",
     "image": "TourLocation.png",
     "summary": "Set touring locations, session timezone and time synchronization settings."
-  },
-  {
-    "id": "WadePluginUpdater",
-    "name": "Wade Plugin Updater",
-    "version": "1.0.0",
-    "folder": "WadePluginUpdater",
-    "archive": "WadePluginUpdater_v1.0.0.zip",
-    "minimum": "2.5.1.0",
-    "note": "Scan connected drives, compare installed/local/online versions, and download or install WadeLightingTools releases. Utility Plugins.",
-    "manifest": "packages/WadePluginUpdater/1.0.0/manifest.tsv",
-    "digest": "23df728ddc3f11a0f7fe521783bd8eb36f5dbd84290eacdd22fcd8a2bbdb0b29",
-    "xml": "WadePluginUpdater_v1.0.0.xml",
-    "bytes": 28827,
-    "zip_sha256": "1eeadb2537d90a005d1f25b1e8cff131f76cf7ab8bbd1ab9d57dbc3abb1902f5",
-    "image": "WadePluginUpdater.png",
-    "summary": "Scan drives, compare versions, and download or install your Wade plugins."
   },
   {
     "id": "WingConfigurator",

@@ -63,3 +63,13 @@ Version 1.1.0 adds the table workflow above and corrects the overbroad connectiv
 Each plugin directory and XML is read once per scan. The online catalog reuses that metadata, reading only newly listed folders; SHA-256 checks are deferred to reviewed local sources. After updates, only affected package records and in-memory showfile metadata refresh. Shows, media, backups and unrelated folders are never traversed.
 
 Imports use the documented object `Import(directory, filename)` on the exact target handle, bypassing Library keyword/cache resolution. New installs create only the planned empty slot. A successful result requires the requested metadata and matching exported Lua component contents; the existing plugin backup remains available after any failure. The native MA engine is not available in this Linux environment, so automated mock checks are not a claim of console verification.
+
+## Plugin Updator 1.1.2
+
+Both Import Online and Import from Drive now prepare a self-contained temporary XML containing the Lua components. This avoids the missing `shared/resource/lib_plugins/ServerCommand/Server_Command.lua` lookup reported by the console. Download to Drives continues to save original release files. The import copy retains metadata and image dependencies, clears external component associations, and preserves component order. Numeric version comparison accepts equivalent three/four-part versions; exported code still has to match before success is reported.
+
+The revised tests model the resource lookup failure that the previous mock missed, and independently decode every catalog package's staged XML with Python. These checks do not execute the MA engine.
+
+## Plugin Updator 1.1.3
+
+Includes the 1.1.2 import corrections. In More Plugins, each uninstalled plugin has a QR Code button opening a large native MA QRCode widget with its own WadeLightingTools page URL. The popup works offline, opens on the current display, shows the exact URL, and uses no image pool slots. The 54-pixel rows and scrollable table remain compact.

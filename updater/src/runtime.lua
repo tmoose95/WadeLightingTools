@@ -13,7 +13,9 @@ return function(Core,Transport,bootstrap,notify,plugin,trustBundle)
  local function valid(h) return h and safe(function()return IsObjectValid(h)end,false) end
  local function read(path,max)
   local f=io.open(path,'rb');if not f then return nil end
-  local s=f:read((max or 33554432)+1);f:close()
+  local s=f:read((max or 33554432)+1)
+  if s==nil and f:seek('end')==0 then s='' end
+  f:close()
   if not s or #s>(max or 33554432) then return nil end;return s
  end
  local function write(path,s)
@@ -54,7 +56,21 @@ return function(Core,Transport,bootstrap,notify,plugin,trustBundle)
  local transport=Transport(Core,{work=work,windows=tostring(HostOS()):lower():find('windows',1,true)~=nil,
   mkdir=mkdir,write=write,read=read,exists=exists,now=now,pause=pause,cancelled=function()return R.cancel end},trustBundle)
  R.prop,R.index,R.valid,R.children,R.pause=prop,index,valid,children,pause
- local function report(text,current,total) notify(text,current,total);Printf('WLT Plugin Updator | %s',text) end
+ local progress
+ local function advance(fraction,text)
+  if not progress then return end
+  local value=((progress.item-1)+progress.start+progress.span*math.min(1,math.max(0,fraction)))/progress.count
+  progress.value=math.max(progress.value,math.min(.999,value))
+  if text then progress.text=text end
+  notify(progress.text,math.floor(progress.value*1000),1000,false)
+ end
+ local function phase(start,finish,text)
+  progress.start,progress.span=start,finish-start;advance(0,text)
+ end
+ local function report(text,current,total)
+  if progress then progress.text=text;current,total=math.floor(progress.value*1000),1000 end
+  Printf('WLT Plugin Updator | %s',text);notify(text,current,total,true)
+ end
  local function issue(text) R.issues[#R.issues+1]=text;report(text) end
  local function driveValid(d)
   return valid(d.handle) and index(d.handle)==d.number and prop(d.handle,'Path')==d.path
@@ -307,28 +323,42 @@ return function(Core,Transport,bootstrap,notify,plugin,trustBundle)
   for _,f in ipairs(m.components) do assert(exists(join(e.folder,f)),'Missing Lua component: '..f) end
  end
  local function release(p)
+  report('Reading release manifest: '..p.name);pulse()
   local bytes=transport.get(p.manifest,262144);local m=Core.manifest(bytes,p)
-  local data={}
+  local data={};local total=m.zip.bytes;local received=0
+  for _,f in ipairs(m.files) do total=total+f.bytes end
+  advance(.02)
+  local function transfer(f)
+   local s=transport.get(f.remote,f.bytes,function(n)
+    advance(.02+.96*(received+math.min(n,f.bytes)*.99)/total)
+   end)
+   report('Verifying '..p.name..' / '..f.path)
+   assert(Core.verify(s,f,pulse),'File checksum mismatch: '..f.path)
+   received=received+f.bytes;advance(.02+.96*received/total)
+   return s
+  end
   for _,f in ipairs(m.files) do
    report('Downloading '..p.name..' / '..f.path);pulse()
-   local s=transport.get(f.remote,f.bytes);assert(Core.verify(s,f,pulse),'File checksum mismatch: '..f.path)
-   data[f.path]=s
+   data[f.path]=transfer(f)
   end
   report('Downloading '..p.name..' ZIP')
-  local zip=transport.get(m.zip.remote,m.zip.bytes);assert(Core.verify(zip,m.zip,pulse),'ZIP checksum mismatch')
+  local zip=transfer(m.zip)
   local meta=Core.xml(data[m.xml]);assert(Core.matches(meta,p) and meta.Version==p.version,'XML release identity mismatch')
   assert((meta.Path or ''):gsub('^/','')==p.folder,'XML folder does not match release folder')
   for _,f in ipairs(meta.components) do assert(data[f],'Release is missing a Lua component: '..f) end
+  advance(1)
   return m,data,zip
  end
- local function savePackage(d,p,m,data,zip)
+ local function savePackage(d,p,m,data,zip,step)
   assertDrive(d)
   local staging=join(d.root,'WadeLightingToolsData/staging/'..unique()..'/'..p.folder)
   assert(mkdir(staging),'Drive is not writable: '..d.label)
-  for _,f in ipairs(m.files) do
+  for i,f in ipairs(m.files) do
+   report('Writing '..d.label..' / '..p.name..' / '..f.path);pulse()
    local path=join(staging,f.path);local parent=path:match('^(.*)/[^/]+$');assert(mkdir(parent))
    assert(write(path,data[f.path]),'Write failed: '..f.path)
    assert(Core.verify(read(path,f.bytes),f,pulse),'Written-file verification failed: '..f.path)
+   step(i/(#m.files+2))
   end
   local zipdir=join(d.root,'WadeLightingToolsData/downloads');assert(mkdir(zipdir))
   local zipname=join(zipdir,m.zip.path);local part=zipname..'.'..unique()..'.part'
@@ -337,6 +367,7 @@ return function(Core,Transport,bootstrap,notify,plugin,trustBundle)
   if exists(zipname) then
    assert(Core.verify(read(zipname,m.zip.bytes),m.zip,pulse),'Existing ZIP has different contents: '..zipname);os.remove(part)
   else assert(os.rename(part,zipname),'Could not finish ZIP download') end
+  step((#m.files+1)/(#m.files+2))
   assertDrive(d);pulse()
   local dest=join(d.root,p.folder)
   local present=exists(join(dest,m.xml)) or next(list(dest,'*'))~=nil
@@ -355,6 +386,7 @@ return function(Core,Transport,bootstrap,notify,plugin,trustBundle)
    error('Could not finish package installation: '..tostring(why))
   end
   local xml=join(dest,m.xml)
+  step(1);report('Drive package verified: '..d.label..' / '..p.name)
   return {drive=d,path=xml,folder=dest,xml=m.xml,version=p.version,meta=Core.xml(data[m.xml]),digest=Core.sha256(data[m.xml])}
  end
  local function backupSlot(item,slot)
@@ -371,9 +403,19 @@ return function(Core,Transport,bootstrap,notify,plugin,trustBundle)
   end
   -- Embedded-only exports are valid backups too; verify their actual Lua.
   local backupXML=read(join(path,filename),16777216)
+  local empty={}
+  -- Preserve zero-byte files exactly. Older failed imports can leave an empty
+  -- component; that existing damage must not make a verified repair impossible.
   Core.luaContents(backupXML,function(f)
-   return read(join(path,f)) or read(join(join(path,(meta.Path or ''):gsub('^/','')),f))
+   local s=read(join(path,f)) or read(join(join(path,(meta.Path or ''):gsub('^/','')),f))
+   if s=='' then empty[#empty+1]=f;return '-- Empty component preserved in backup' end
+   return s
   end)
+  if #empty>0 then
+   slot.incomplete=table.concat(empty,', ')
+   assert(write(join(path,'INCOMPLETE-BACKUP.txt'),'Existing exported Lua was empty: '..slot.incomplete..'\nThis is a snapshot of the damaged slot, not a runnable recovery copy.\n'))
+   report('Existing empty Lua component: '..slot.incomplete..' (snapshot preserved)')
+  end
   report('Show plugin backup: '..path)
   slot.backup=path
  end
@@ -387,14 +429,22 @@ return function(Core,Transport,bootstrap,notify,plugin,trustBundle)
   assert(write(join(importFolder,importName),embedded),'Could not write self-contained import XML')
   assert(read(join(importFolder,importName),16777216)==embedded,'Import XML readback differs')
   assert(valid(plan.pool) and index(plan.pool)==plan.poolNumber,'Destination DataPool changed')
+  advance(.1,'Preparing verified import: '..item.plugin.name)
+  local repairs={}
   for _,slot in ipairs(item.slots) do
    assert(valid(slot.pool) and index(slot.pool)==slot.poolNumber,'Destination DataPool changed')
    local current=slot.pool.Plugins[slot.slot]
    if slot.handle then assert(current==slot.handle,'Plugin slot changed after review')
    else assert(not valid(current),'New plugin slot is now occupied') end
    if not slot.backup then backupSlot(item,slot) end
+   if slot.incomplete then repairs[#repairs+1]='DataPool '..slot.poolNumber..' / Plugin '..slot.slot..': '..slot.incomplete..'\nSnapshot: '..slot.backup end
   end
-  for _,slot in ipairs(item.slots) do
+  if #repairs>0 then
+   local choice=MessageBox({title='Repair empty plugin component',message=item.plugin.name..' has an empty Lua component in the existing showfile export. Its damaged state has been saved, but that snapshot cannot restore working code.\n\n'..table.concat(repairs,'\n\n')..'\n\nThe replacement package has been read and its Lua compiled. Repair these slots from version '..item.version..'?',commands={{value=1,name='Repair from verified package'},{value=0,name='Cancel'}}})
+   assert(choice and choice.success and choice.result==1,'Repair cancelled; existing show slots were not changed')
+  end
+  for slotIndex,slot in ipairs(item.slots) do
+   local function step(n) advance(.1+.9*((slotIndex-1)+n)/#item.slots) end
    pulse();assertDrive(source.drive)
    local target=slot.pool.Plugins[slot.slot]
    if not slot.handle then
@@ -409,6 +459,7 @@ return function(Core,Transport,bootstrap,notify,plugin,trustBundle)
    -- of this USB/library folder. Import verified embedded FileContent instead.
    assert(target:Import(importFolder,importName),
     'Native object import failed at '..where..' from '..join(importFolder,importName)..recovery)
+   step(.45)
    local untilTime=now()+3;local found
    repeat
     pause(.05);found=slot.pool.Plugins[slot.slot]
@@ -420,6 +471,7 @@ return function(Core,Transport,bootstrap,notify,plugin,trustBundle)
     '; found '..actual.Name..' '..actual.Version..' / Author '..actual.Author..' / Path '..actual.Path..recovery)
    -- A version alone cannot prove that the Lua component was replaced.
    local check=join(work,'verify_'..unique())
+   report('Checking imported Lua: '..item.plugin.name..' / '..where);step(.6)
    assert(mkdir(check),'Cannot create import verification folder'..recovery)
    assert(found:Export(check,'Plugin.xml'),'Cannot verify imported Lua at '..where..recovery)
    local exportedXML=read(join(check,'Plugin.xml'),16777216)
@@ -434,6 +486,7 @@ return function(Core,Transport,bootstrap,notify,plugin,trustBundle)
      'Imported Lua did not match component '..i..' at '..where..recovery)
    end
    report('Installed '..item.plugin.name..' '..item.version..' at Plugin '..slot.slot)
+   step(1)
   end
  end
  local function remember(p,entry)
@@ -445,27 +498,42 @@ return function(Core,Transport,bootstrap,notify,plugin,trustBundle)
   R.localFiles[p.id]=a;R.localChoice[p.id]=nil
  end
  function R.run(plan)
-  R.cancel=false;local results={}
-  for _,item in ipairs(plan.items) do
+  R.cancel=false;local results={};local completed=0
+  progress={item=1,count=#plan.items,start=0,span=0,value=0,text='Starting update'}
+  report('Starting update',0,1000)
+  for itemIndex,item in ipairs(plan.items) do
    if R.cancel then break end
+   progress.item=itemIndex
    local ok,why=pcall(function()
     local source=item.source
+    local downloadEnd=item.mode==2 and .65 or .55
+    local saveEnd=item.mode==2 and 1 or .8
     -- Preserve the original show code before replacing any library source folder.
-    if item.mode~=2 then for _,slot in ipairs(item.slots) do backupSlot(item,slot) end end
+    if item.mode~=2 then
+     phase(0,item.mode==3 and .2 or .1,'Backing up '..item.plugin.name)
+     for i,slot in ipairs(item.slots) do pulse();backupSlot(item,slot);advance(i/#item.slots) end
+    end
     if item.mode~=3 then
+     phase(item.mode==2 and 0 or .1,downloadEnd,'Downloading '..item.plugin.name)
      local m,data,zip=release(item.plugin);local sources={}
-     for _,d in ipairs(plan.drives) do
-      pulse();local entry=savePackage(d,item.plugin,m,data,zip)
+     phase(downloadEnd,saveEnd,'Saving '..item.plugin.name)
+     for i,d in ipairs(plan.drives) do
+      pulse();local entry=savePackage(d,item.plugin,m,data,zip,function(n)advance(((i-1)+n)/#plan.drives)end)
       sources[#sources+1]=entry;remember(item.plugin,entry)
      end
      source=sources[1]
     end
-    if item.mode~=2 then install(item,source,plan) end
+    if item.mode~=2 then phase(item.mode==3 and .2 or .8,1,'Preparing import: '..item.plugin.name);install(item,source,plan) end
    end)
    results[#results+1]=(ok and 'OK: ' or 'FAILED: ')..item.plugin.name..(ok and '' or (' - '..tostring(why)))
    if not ok then issue(results[#results]);break end -- Stop batch after first partial/failure.
+   completed=completed+1
   end
   R.refreshInstalled()
+  if completed==#plan.items and not R.cancel then
+   progress.value=1;report('Update complete - all selected actions verified')
+  elseif R.cancel then report('Update cancelled') end
+  progress=nil
   return table.concat(results,'\n')
  end
  R.pool=DataPool()

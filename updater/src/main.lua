@@ -1,20 +1,31 @@
 -- Native MA3 table UI. Every action is staged for review before file/show changes.
-local VERSION='1.1.3'
-local ui={actions={},busy=false,tab=1,cells={}}
+local VERSION='1.1.4'
+local ui={actions={},busy=false,tab=1,cells={},activity={}}
 local R,build,scan
 local function valid(h) return h and safe(function()return IsObjectValid(h)end,false) end
 local function remove(h) if valid(h) then safe(function()Obj.Delete(h:Parent(),Obj.Index(h))end) end end
-local function notify(text,current,total)
+local function notify(text,current,total,log)
  if valid(ui.status) then ui.status.Text=text end
+ if valid(ui.updateStatus) then ui.updateStatus.Text=text end
+ if log then
+  ui.activity[#ui.activity+1]=tostring(text):gsub('[\r\n]+',' ')
+  while #ui.activity>3 do table.remove(ui.activity,1) end
+  for i,o in ipairs(ui.activityLabels or {}) do if valid(o)then o.Text=ui.activity[i] or '' end end
+ end
  if ui.progress then
   safe(function()SetProgressText(ui.progress,text)end)
-  if current and total then safe(function()SetProgressRange(ui.progress,0,total);SetProgress(ui.progress,current)end) end
+  if current and total and total>0 then
+   local value=math.floor(1000*math.max(0,math.min(1,current/total)))
+   safe(function()SetProgressRange(ui.progress,0,1000);SetProgress(ui.progress,value)end)
+   if valid(ui.percent) then ui.percent.Text=string.format('%d%%',math.floor(value/10)) end
+   if valid(ui.fill)then ui.fill.Visible=value>0 and 'Yes' or 'No';ui.fill.W=ui.trackWidth*value/1000 end
+  end
  end
 end
 local function close()
  if ui.busy then if R then R.cancel=true end;ui.exitAfterCancel=true;notify('Cancelling...');return end
- remove(ui.qrBase);remove(ui.chooser);remove(ui.scanBase);remove(ui.base)
- ui.qrBase=nil;ui.chooser=nil;ui.scanBase=nil;ui.base=nil
+ remove(ui.qrBase);remove(ui.chooser);remove(ui.scanBase);remove(ui.updateBase);remove(ui.base)
+ ui.qrBase=nil;ui.chooser=nil;ui.scanBase=nil;ui.updateBase=nil;ui.base=nil
  if _G.__WadeLightingToolsWindow==ui then _G.__WadeLightingToolsWindow=nil end
 end
 local function errorbox(err) MessageBox({title='WLT Plugin Updator',message=tostring(err),commands={{value=1,name='OK'}}}) end
@@ -81,6 +92,34 @@ local function drawScan()
  local message=label(body,0,0,'Checking plugin libraries and showfile versions.\nInternal storage and connected USB drives only.','Regular20');message.TextalignmentH='Centre'
  ui.status=label(body,0,1,'Starting scan...');ui.status.TextalignmentH='Centre'
  button(b,0,2,'CancelScan','Cancel & Exit','WLTClose')
+end
+local function drawUpdate()
+ remove(ui.updateBase);ui.activity={};ui.activityLabels={}
+ local d=ui.display;local face,green=colors()
+ local b=d.ScreenOverlay:Append('BaseInput');ui.updateBase=b
+ b.Name='WLTUpdating';b.W=math.min(1100,d.W*.94);b.H=350;b.Columns=1;b.Rows=6;b.AutoClose='No';b.CloseOnEscape='No'
+ for i,h in ipairs({50,64,42,26,108,60})do b[1][i].SizePolicy='Fixed';b[1][i].Size=tostring(h)end
+ local title=b:Append('TitleBar');title.Anchors='0,0';title.Columns=1;title.Rows=1
+ local cap=title:Append('TitleButton');cap.Anchors='0,0';cap.Text='WLT Plugin Updator - Updating';cap.Texture='corner1'
+ ui.updateStatus=label(b,0,1,'Starting update...','Regular18')
+ local track=grid(b,'UpdateProgress',1,1,'0,2');track.BackColor=face;track.Margin={left=12,right=12,top=4,bottom=4}
+ ui.trackWidth=b.W-24
+ ui.fill=track:Append('UIObject');ui.fill.Name='UpdateProgressFill';ui.fill.Anchors='0,0';ui.fill.AlignmentH='Left';ui.fill.W=0;ui.fill.Visible='No';ui.fill.BackColor=green
+ ui.percent=label(track,0,0,'0%','Regular18');ui.percent.Name='UpdatePercent';ui.percent.TextalignmentH='Centre'
+ local heading=label(b,0,3,'System Monitor - latest messages','Regular16');heading.Name='UpdateLogHeading'
+ local panel=grid(b,'UpdateLog',1,1,'0,4');panel.Margin={left=12,right=12,top=0,bottom=0}
+ -- Native monitor follows MA messages, including import/export feedback from
+ -- the engine. Its viewport is three lines high at the regular 24px line size.
+ local monitor=safe(function()
+  if not ClassExists('SystemMonitorWindow')then return end
+  local o=panel:Append('SystemMonitorWindow');o.Name='UpdateSystemMonitor';o.Anchors='0,0';o.Font='Regular16';o.H=72;o.AlignmentV='Bottom';return o
+ end,nil)
+ if not valid(monitor)then
+  heading.Text='Updater activity - last 3 messages (System Monitor view unavailable)'
+  local lines=grid(panel,'UpdateActivity',1,3,'0,0')
+  for i=1,3 do local o=label(lines,0,i-1,'','Regular16');o.Name='UpdateActivity'..i;ui.activityLabels[i]=o end
+ end
+ button(b,0,5,'CancelUpdate','Cancel & Exit','WLTClose')
 end
 scan=function(connect)
  ui.busy=true;ui.exitAfterCancel=false;drawScan()
@@ -202,9 +241,11 @@ signalTable.WLTUpdate=function()guarded(function()
  local drives={};for _,d in ipairs(plan.drives)do drives[#drives+1]=d.label end
  local a=MessageBox({title='Review updates',message='Drives: '..table.concat(drives,', ')..'\n\n'..table.concat(plan.lines,'\n\n'),commands={{value=1,name='Update'},{value=0,name='Cancel'}}})
  if not a or not a.success or a.result~=1 then return end
- ui.busy=true;R.cancel=false;ui.exitAfterCancel=false;ui.progress=StartProgress('WLT Plugin Updator | Updating')
+ ui.busy=true;R.cancel=false;ui.exitAfterCancel=false;drawUpdate();ui.progress=StartProgress('WLT Plugin Updator | Updating')
+ notify('Starting update',0,1000,true);R.pause(.01)
  local ok,result=pcall(R.run,plan)
- StopProgress(ui.progress);ui.progress=nil;ui.busy=false
+ if not ok then notify(tostring(result),nil,nil,true) end
+ StopProgress(ui.progress);ui.progress=nil;ui.busy=false;remove(ui.updateBase);ui.updateBase=nil
  MessageBox({title=ok and 'Update results' or 'Update stopped',message=tostring(result),commands={{value=1,name='Close'}}})
  ui.actions={}
  if ui.exitAfterCancel then close();return end
@@ -290,7 +331,7 @@ build=function(display)
 end
 local function metadata()
  safe(function()
-  local p=myHandle:Parent();local appearance=Root().ShowData.Appearances.PluginUpdator_1_1_3
+  local p=myHandle:Parent();local appearance=Root().ShowData.Appearances.PluginUpdator_1_1_4
   if appearance then p.Appearance=appearance end
   local tag
   for _,t in ipairs(ObjectList('Tag Thru')or{})do if R.prop(t,'Name')=='Utility Plugins'then tag=t;break end end
@@ -302,7 +343,7 @@ end
 return function()
  local old=_G.__WadeLightingToolsWindow
  if old and old.busy then errorbox('An update or scan is already running.');return end
- if old then remove(old.qrBase);remove(old.chooser);remove(old.scanBase);remove(old.base)end
+ if old then remove(old.qrBase);remove(old.chooser);remove(old.scanBase);remove(old.updateBase);remove(old.base)end
  _G.__WadeLightingToolsWindow=ui;ui.busy=true;ui.actions={}
  local ok,why=pcall(function()
   R=Runtime(Core,Transport,BOOTSTRAP,notify,myHandle:Parent(),TRUST_BUNDLE)

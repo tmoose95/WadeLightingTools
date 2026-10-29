@@ -56,6 +56,7 @@ return function(Core, env, trustBundle)
    'rc=127',
    'if command -v curl >/dev/null 2>&1; then',
    ' echo "curl / system trust" >'..sh(job..'/client'),
+   ' echo body >'..sh(kind),
    ' run_bounded curl --fail --silent --show-error --proto "=https" --connect-timeout 8 --max-time 30 --max-filesize '..limit..' --output '..sh(body)..' '..sh(url)..' 2>'..sh(err),
    ' rc=$?; echo body >'..sh(kind)}
   if ca then
@@ -67,12 +68,14 @@ return function(Core, env, trustBundle)
   script[#script+1]='elif command -v openssl >/dev/null 2>&1; then'
   script[#script+1]=' eofOption=; case "$(openssl s_client -help 2>&1)" in *-ignore_unexpected_eof*) eofOption=-ignore_unexpected_eof;; esac'
   script[#script+1]=' echo "OpenSSL / bundled Mozilla trust" >'..sh(job..'/client')
+  script[#script+1]=' echo http >'..sh(kind)
   script[#script+1]=' run_bounded openssl s_client -quiet $eofOption -connect raw.githubusercontent.com:443 -servername raw.githubusercontent.com -verify_hostname raw.githubusercontent.com -verify_return_error'..cert..' <'..sh(job..'/request')..' >'..sh(body)..' 2>'..sh(err)
   script[#script+1]=' rc=$?; echo http >'..sh(kind)
   -- BusyBox wget builds may omit peer verification; only accept GNU Wget here.
   script[#script+1]='elif command -v wget >/dev/null 2>&1; then'
   script[#script+1]=' case "$(wget --version 2>/dev/null)" in *"GNU Wget"*)'
   script[#script+1]='  echo "GNU Wget / bundled Mozilla trust" >'..sh(job..'/client')
+  script[#script+1]='  echo body >'..sh(kind)
   script[#script+1]='  run_bounded wget --https-only --max-redirect=0 --timeout=30 --tries=1'..(ca and (' --ca-certificate='..sh(ca)) or '')..' -O '..sh(body)..' '..sh(url)..' 2>'..sh(err)
   script[#script+1]='  rc=$?; echo body >'..sh(kind)..';;'
   script[#script+1]='  *) echo "This wget build does not provide the required certificate checks; curl or OpenSSL is needed." >'..sh(err)..';; esac'
@@ -81,7 +84,20 @@ return function(Core, env, trustBundle)
   script[#script+1]='printf "%s" "$rc" >'..sh(done)
   return table.concat(script,'\n')..'\n'
  end
- function T.get(remote,limit)
+ -- Read only the file size and a bounded HTTP header while the process writes.
+ -- Chunked responses advance on completion, never count framing as payload.
+ local function received(body,mode)
+  local f=io.open(body,'rb');if not f then return 0 end
+  local size=f:seek('end') or 0;local n=size
+  if mode:match('http') then
+   f:seek('set');local prefix=f:read(math.min(size,65536)) or ''
+   local finish=prefix:find('\r\n\r\n',1,true)
+   if not finish or prefix:sub(1,finish):lower():find('transfer%-encoding:%s*chunked') then n=0
+   else n=math.max(0,size-finish-3) end
+  end
+  f:close();return n
+ end
+ function T.get(remote,limit,onProgress)
   assert(Core.path(remote),'Unsafe download path')
   assert(type(limit)=='number' and limit>0 and limit<=33554432,'Invalid download limit')
   serial=serial+1
@@ -96,7 +112,7 @@ return function(Core, env, trustBundle)
     .."$r.UserAgent='WadeLightingTools/1.1.0';$p=$r.GetResponse();if([int]$p.StatusCode -ne 200){throw 'HTTP status'};"
     .."$s=$p.GetResponseStream();$f=[IO.File]::OpenWrite("..ps(body)..");try{$b=New-Object byte[] 32768;$n=0;$timer=[Diagnostics.Stopwatch]::StartNew();"
     .."while(($k=$s.Read($b,0,$b.Length)) -gt 0){if($timer.Elapsed.TotalSeconds -gt 35){throw 'Request timed out'};"
-    .."if([IO.File]::Exists("..ps(job..'/cancel')..")){throw 'Cancelled'};$n+=$k;if($n -gt "..limit.."){throw 'Download too large'};$f.Write($b,0,$k)}}"
+    .."if([IO.File]::Exists("..ps(job..'/cancel')..")){throw 'Cancelled'};$n+=$k;if($n -gt "..limit.."){throw 'Download too large'};$f.Write($b,0,$k);[IO.File]::WriteAllText("..ps(job..'/bytes')..",[string]$n)}}"
     .."finally{$f.Dispose();$s.Dispose();$p.Dispose()};[IO.File]::WriteAllText("..ps(kind)..",'body');"
     .."[IO.File]::WriteAllText("..ps(done)..",'0')}catch{[IO.File]::WriteAllText("..ps(err)..",$_.Exception.Message);"
     .."[IO.File]::WriteAllText("..ps(done)..",'1')}"
@@ -114,10 +130,16 @@ return function(Core, env, trustBundle)
    assert(result==true or result==0,'Could not start HTTPS downloader')
   end
   local started=env.now()
+  local last=0;if onProgress then onProgress(0,limit) end
   while not env.exists(done) do
    if env.cancelled() or env.now()-started>=75 then
     env.write(job..'/cancel','1')
     error(env.cancelled() and 'Cancelled' or 'Catalog server request timed out')
+   end
+   if onProgress then
+    local n=env.windows and tonumber(env.read(job..'/bytes',32)) or received(body,env.read(kind,64) or 'http')
+    n=math.max(last,math.min(limit-1,n or 0))
+    if n>last then last=n;onProgress(n,limit) end
    end
    env.pause(0.1)
   end
@@ -133,11 +155,13 @@ return function(Core, env, trustBundle)
   local mode=env.read(kind,64) or ''
   if mode:match('http') then data=response(data,limit) end
   assert(#data<=limit,'Download too large')
-  for _,f in ipairs({'payload','done','error','kind','request','fetch.sh','client','ca.pem','cancel'}) do os.remove(job..'/'..f) end
+  if onProgress then onProgress(#data,limit) end
+  for _,f in ipairs({'payload','done','error','kind','request','fetch.sh','client','ca.pem','cancel','bytes'}) do os.remove(job..'/'..f) end
   os.remove(job);T.lastError=nil
   return data
  end
  T.response=response
  T.unixJob=unixJob
+ T.received=received
  return T
 end

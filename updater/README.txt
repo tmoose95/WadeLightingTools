@@ -1,4 +1,4 @@
-WLT PLUGIN UPDATOR v1.1.3
+WLT PLUGIN UPDATOR v1.1.4
 Aaron Wade - Crossfade Design
 Target: grandMA3 2.5.1.0 and later 2.5 releases
 
@@ -6,7 +6,7 @@ INSTALL
 1. Close the previous updater and extract this ZIP.
 2. Copy WLT Plugin Updator into grandMA3/gma3_library/datapools/plugins/ on USB.
 3. Edit the existing updater pool slot (or an empty slot), choose your USB,
-   and import WLT Plugin Updator_v1.1.3.xml from that folder.
+   and import WLT Plugin Updator_v1.1.4.xml from that folder.
 4. Run it. A progress window scans connected drives and the showfile before
    opening the main table. Cancel & Exit stops the scan.
 
@@ -133,3 +133,19 @@ still need confirmation on the station.
 Independent WLT implementation, using the supplied screenshots as a workflow
 reference. No MATools code, account services, advertising or branding included.
 Certificate bundle attribution is in CA-LICENSE.txt.
+
+CHANGES IN 1.1.4
+- Confirm opens a progress panel with a bar and percentage. Download byte counts
+  and completed backup/write/import-verification steps advance overall progress.
+  Stage weights describe work completed, not an estimated time remaining.
+  Progress reaches 100% only when every selected action is verified.
+- A compact native System Monitor viewport shows recent engine messages. The
+  viewport is sized for three lines; font/scaling behavior needs console checking.
+  If unavailable, three explicitly labelled updater activity lines show the
+  latest messages also sent to System Monitor. Byte updates do not flood the log.
+- Existing zero-byte exported Lua components trigger a repair choice after the
+  replacement has been validated and compiled. A damaged-state snapshot and
+  INCOMPLETE-BACKUP.txt are preserved. This snapshot cannot restore working code.
+  Choose Repair from verified package to replace the damaged slots, or Cancel.
+  Missing backups and invalid replacement code still stop the operation.
+- No console/onPC execution is claimed by the automated verification.

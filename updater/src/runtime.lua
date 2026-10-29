@@ -25,9 +25,12 @@ return function(Core,Transport,bootstrap,notify,plugin,trustBundle)
  local function list(p,filter) return safe(function()return DirList(p,filter or '*')end,{}) or {} end
  local function now() return safe(function()return Time()end,os.time()) end
  local function pause(t) if coroutine.isyieldable() then coroutine.yield(t or .001) end end
- local function pulse() if R.cancel then error('Cancelled') end;pause(.001) end
+ local lastYield=0
+ local function pulse()
+  if R.cancel then error('Cancelled') end
+  local t=now();if t-lastYield>=.02 then lastYield=t;pause(.001) end
+ end
  local function join(a,b) return a:gsub('[/\\]+$','')..'/'..b end
- local function q(s) assert(not s:find('["\r\n]'),'Unsupported quote in path');return '"'..s..'"' end
  local function checked(command)
   local answer=Cmd(command)
   assert(tostring(answer or ''):match('^%s*[Oo][Kk]%s*[:%s]*$'),tostring(answer or 'No command feedback'))
@@ -51,7 +54,7 @@ return function(Core,Transport,bootstrap,notify,plugin,trustBundle)
  local transport=Transport(Core,{work=work,windows=tostring(HostOS()):lower():find('windows',1,true)~=nil,
   mkdir=mkdir,write=write,read=read,exists=exists,now=now,pause=pause,cancelled=function()return R.cancel end},trustBundle)
  R.prop,R.index,R.valid,R.children,R.pause=prop,index,valid,children,pause
- local function report(text) notify(text);Printf('WLT Plugin Updator | %s',text) end
+ local function report(text,current,total) notify(text,current,total);Printf('WLT Plugin Updator | %s',text) end
  local function issue(text) R.issues[#R.issues+1]=text;report(text) end
  local function driveValid(d)
   return valid(d.handle) and index(d.handle)==d.number and prop(d.handle,'Path')==d.path
@@ -81,28 +84,46 @@ return function(Core,Transport,bootstrap,notify,plugin,trustBundle)
    end
   end
  end
- local function addLocal(path,d,p)
-  local data=read(path,16777216);local m=Core.xml(data)
+ local folderCache={}
+ local function addLocal(record,d,p)
+  local path,m=record.path,record.meta
   if not Core.matches(m,p) then return end
   local folder=path:match('^(.*)[/\\][^/\\]+$')
   local complete=true
   for _,f in ipairs(m.components) do if not exists(join(folder,f)) then complete=false end end
   if not complete then issue(d.label..': '..m.Name..' '..m.Version..' has missing Lua files');return end
-  local entry={drive=d,path=path,folder=folder,xml=path:match('[^/\\]+$'),version=m.Version,meta=m,digest=Core.sha256(data,pulse)}
+  -- Discovery needs metadata only. Hash a local source when it is selected
+  -- for review, never every embedded image/XML on every connected drive.
+  local entry={drive=d,path=path,folder=folder,xml=path:match('[^/\\]+$'),version=m.Version,meta=m}
   local a=R.localFiles[p.id] or {};R.localFiles[p.id]=a;a[#a+1]=entry
  end
  local function scanFolders()
   R.localFiles={}
+  local folders={''};local names={}
+  for _,p in ipairs(R.catalog) do if not names[p.folder] then names[p.folder]=true;folders[#folders+1]=p.folder end end
+  local done,total=0,#R.drives*#folders
   for _,d in ipairs(R.drives) do
    if driveValid(d) then
-    report('Scanning '..d.label)
-    for _,p in ipairs(R.catalog) do
-     for _,folder in ipairs({join(d.root,p.folder),d.root}) do
+    for _,name in ipairs(folders) do
+     local folder=name=='' and d.root or join(d.root,name)
+     local records=folderCache[folder]
+     if not records then
+      records={};folderCache[folder]=records;R.scanStats.folders=R.scanStats.folders+1
+      report('Reading plugin folders: '..d.label..(name=='' and ' / XML exports' or ' / '..name),done,total)
       for _,file in pairs(list(folder,'*.xml')) do
        local n=type(file)=='table' and file.name or nil
-       if n and Core.path(n) and not n:find('/') and n:lower():match('%.xml$') then addLocal(join(folder,n),d,p) end
+       if n and Core.path(n) and not n:find('/') and n:lower():match('%.xml$') then
+        local path=join(folder,n);local meta=Core.xml(read(path,16777216))
+        R.scanStats.xml=R.scanStats.xml+1
+        if meta then records[#records+1]={path=path,meta=meta} end
+        pulse()
+       end
       end
      end
+     for _,record in ipairs(records) do
+      for _,p in ipairs(R.catalog) do if Core.matches(record.meta,p) then addLocal(record,d,p);break end end
+     end
+     done=done+1
      pulse()
     end
    end
@@ -111,20 +132,26 @@ return function(Core,Transport,bootstrap,notify,plugin,trustBundle)
  end
  function R.scan(connect)
   R.cancel=false;R.issues={};R.drives={};R.localChoice={}
+  folderCache={};R.scanStats={folders=0,xml=0,skipped=0}
   local old=R.selectedDrives;R.selectedDrives={}
+  local seen={}
   local collection=safe(function()return Root().Temp.DriveCollect end,nil)
   for _,h in pairs(children(collection)) do
    local n,path=index(h),prop(h,'Path');local kind=prop(h,'DriveType'):lower()
-   if n and n>0 and n%1==0 and path~='' and valid(h) then
+   local external=kind=='removeable' or kind=='removable'
+   -- DriveCollect includes virtual drives for older software and remote
+   -- stations. Only the current internal library and attached USBs qualify.
+   if n and (n==1 or external) and kind~='oldversion' and path~='' and valid(h) then
     local r=n==1 and root or pluginRoot(path)
-    if type(r)=='string' and r~='' then
-     local d={handle=h,number=n,path=path,root=r,label='Drive '..n..' - '..prop(h,'Name'),external=kind=='removeable' or kind=='removable'}
+    if type(r)=='string' and r~='' and not seen[r] then
+     seen[r]=true
+     local d={handle=h,number=n,path=path,root=r,label='Drive '..n..' - '..prop(h,'Name'),external=external}
      R.drives[#R.drives+1]=d
      if old[path] then R.selectedDrives[path]=true end
-    else
+    elseif not r or r=='' then
      issue('Drive '..n..' - '..prop(h,'Name')..': plugin library path is unavailable; drive skipped')
     end
-   end
+   else R.scanStats.skipped=R.scanStats.skipped+1 end
   end
   table.sort(R.drives,function(a,b)return a.number<b.number end)
   if next(R.selectedDrives)==nil then
@@ -140,14 +167,16 @@ return function(Core,Transport,bootstrap,notify,plugin,trustBundle)
     return Core.catalog(transport.get('catalog.tsv',262144))
    end)
    if ok then
-    R.catalog=new;R.online=true;R.connectionError=nil;R.client=transport.client;scanFolders()
+    R.catalog=new;R.online=true;R.connectionError=nil;R.client=transport.client
+    -- Reclassify cached metadata; only newly published plugin folders incur IO.
+    scanFolders()
    else
     if R.cancel then error('Cancelled') end
     R.online=false;R.connectionError=tostring(new);R.client=transport.client
     issue('Online catalog unavailable. Local packages remain available. '..R.connectionError)
    end
   end
-  R.refreshInstalled();report(#R.drives..' drive(s) scanned | '..(R.online and 'Online catalog loaded' or 'Local catalog'))
+  R.refreshInstalled();report(#R.drives..' plugin libraries / '..R.scanStats.xml..' XML files | '..(R.online and 'Online catalog loaded' or 'Local catalog'),1,1)
  end
  function R.localBest(p,selectedOnly)
   for _,e in ipairs(R.localFiles[p.id] or {}) do
@@ -223,6 +252,14 @@ return function(Core,Transport,bootstrap,notify,plugin,trustBundle)
    local source=mode==3 and R.localSource(p) or nil
    assert(mode==3 or R.online,'Online catalog is unavailable. Choose Import from Drive for a local copy.')
    assert(mode~=3 or source,'No complete local package on a selected drive: '..p.name)
+   if source then
+    local data=assert(read(source.path,16777216),'Local XML no longer exists; rescan')
+    local meta=Core.xml(data)
+    assert(Core.matches(meta,p) and meta.Version==source.version,'Local package changed; rescan')
+    -- Freeze the reviewed source, independent of the live table entry.
+    local snapshot={};for k,v in pairs(source) do snapshot[k]=v end
+    source=snapshot;source.digest=Core.sha256(data,pulse)
+   end
    local v=source and source.version or p.version
    if mode~=3 then
     for _,e in ipairs(R.localFiles[p.id] or {}) do
@@ -347,19 +384,52 @@ return function(Core,Transport,bootstrap,notify,plugin,trustBundle)
   end
   for _,slot in ipairs(item.slots) do
    pulse();assertDrive(source.drive)
-   local relative=source.folder:sub(#source.drive.root+1):gsub('^[/\\]','')
-   assert(source.folder:sub(1,#source.drive.root)==source.drive.root,'Import path is outside the plugin library')
-   checked('Import Plugin Library '..q(source.xml)..' At DataPool '..slot.poolNumber..' Plugin '..slot.slot
-    ..' If Drive '..source.drive.number..' /Path '..q(relative=='' and '.' or relative)..' /NoConfirmation')
+   local target=slot.pool.Plugins[slot.slot]
+   if not slot.handle then
+    checked('Store DataPool '..slot.poolNumber..' Plugin '..slot.slot..' /NoConfirmation')
+    target=slot.pool.Plugins[slot.slot]
+   end
+   local where='DataPool '..slot.poolNumber..' / Plugin '..slot.slot
+   local recovery=' Backup: '..tostring(slot.backup or 'new slot')
+   assert(valid(target),'Could not create import target at '..where..recovery)
+   report('Importing '..item.plugin.name..' into '..where)
+   -- Import the XML directly into its target handle. Library keyword lookup
+   -- consults libcache.dat and can report OK without replacing the plugin.
+   -- MA's object API accepts the absolute directory and returns a boolean.
+   assert(target:Import(source.folder,source.xml),
+    'Native object import failed at '..where..' from '..source.path..recovery)
    local untilTime=now()+3;local found
    repeat
     pause(.05);found=slot.pool.Plugins[slot.slot]
     if valid(found) and prop(found,'Version')==item.version then break end
    until now()>=untilTime
    assert(valid(found) and Core.matches(pluginMeta(found),item.plugin) and prop(found,'Version')==item.version,
-    'Import was not verified at Plugin '..slot.slot..'. Backup: '..tostring(slot.backup or 'new slot'))
+    'Imported metadata was not verified at '..where..recovery)
+   -- A version alone cannot prove that the Lua component was replaced.
+   local check=join(work,'verify_'..unique())
+   assert(mkdir(check),'Cannot create import verification folder'..recovery)
+   assert(found:Export(check,'Plugin.xml'),'Cannot verify imported Lua at '..where..recovery)
+   local exported=Core.xml(read(join(check,'Plugin.xml'),16777216))
+   assert(exported and #exported.components==#source.meta.components and #exported.components>0,
+    'Imported Lua component count differs at '..where..recovery)
+   local function normal(s) return s and s:gsub('\r\n','\n'):gsub('\n+$','') end
+   for i,f in ipairs(source.meta.components) do
+    local ef=exported.components[i]
+    local actual=read(join(check,ef)) or read(join(join(check,(exported.Path or ''):gsub('^/','')),ef))
+    local expected=read(join(source.folder,f))
+    assert(actual and expected and normal(actual)==normal(expected),
+     'Imported Lua did not match '..f..' at '..where..recovery)
+   end
    report('Installed '..item.plugin.name..' '..item.version..' at Plugin '..slot.slot)
   end
+ end
+ local function remember(p,entry)
+  local a={}
+  for _,e in ipairs(R.localFiles[p.id] or {}) do
+   if e.folder~=entry.folder then a[#a+1]=e end
+  end
+  a[#a+1]=entry;table.sort(a,function(x,y)return (Core.compare(x.version,y.version) or 0)>0 end)
+  R.localFiles[p.id]=a;R.localChoice[p.id]=nil
  end
  function R.run(plan)
   R.cancel=false;local results={}
@@ -371,7 +441,10 @@ return function(Core,Transport,bootstrap,notify,plugin,trustBundle)
     if item.mode~=2 then for _,slot in ipairs(item.slots) do backupSlot(item,slot) end end
     if item.mode~=3 then
      local m,data,zip=release(item.plugin);local sources={}
-     for _,d in ipairs(plan.drives) do pulse();sources[#sources+1]=savePackage(d,item.plugin,m,data,zip) end
+     for _,d in ipairs(plan.drives) do
+      pulse();local entry=savePackage(d,item.plugin,m,data,zip)
+      sources[#sources+1]=entry;remember(item.plugin,entry)
+     end
      source=sources[1]
     end
     if item.mode~=2 then install(item,source,plan) end
@@ -379,6 +452,7 @@ return function(Core,Transport,bootstrap,notify,plugin,trustBundle)
    results[#results+1]=(ok and 'OK: ' or 'FAILED: ')..item.plugin.name..(ok and '' or (' - '..tostring(why)))
    if not ok then issue(results[#results]);break end -- Stop batch after first partial/failure.
   end
+  R.refreshInstalled()
   return table.concat(results,'\n')
  end
  R.pool=DataPool()

@@ -1,12 +1,15 @@
 -- Native MA3 table UI. Every action is staged for review before file/show changes.
-local VERSION='1.1.0'
+local VERSION='1.1.1'
 local ui={actions={},busy=false,tab=1,cells={}}
 local R,build,scan
 local function valid(h) return h and safe(function()return IsObjectValid(h)end,false) end
 local function remove(h) if valid(h) then safe(function()Obj.Delete(h:Parent(),Obj.Index(h))end) end end
-local function notify(text)
+local function notify(text,current,total)
  if valid(ui.status) then ui.status.Text=text end
- if ui.progress then safe(function()SetProgressText(ui.progress,text)end) end
+ if ui.progress then
+  safe(function()SetProgressText(ui.progress,text)end)
+  if current and total then safe(function()SetProgressRange(ui.progress,0,total);SetProgress(ui.progress,current)end) end
+ end
 end
 local function close()
  if ui.busy then if R then R.cancel=true end;ui.exitAfterCancel=true;notify('Cancelling...');return end
@@ -72,7 +75,7 @@ local function drawScan()
  local title=b:Append('TitleBar');title.Anchors='0,0';title.Columns=1;title.Rows=1
  local cap=title:Append('TitleButton');cap.Anchors='0,0';cap.Text='WLT Plugin Updator';cap.Texture='corner1'
  local body=grid(b,'ScanBody',1,2,'0,1')
- local message=label(body,0,0,'Scanning connected drives and showfile for plugin versions.\nThis may take a few moments.','Regular20');message.TextalignmentH='Centre'
+ local message=label(body,0,0,'Checking plugin libraries and showfile versions.\nInternal storage and connected USB drives only.','Regular20');message.TextalignmentH='Centre'
  ui.status=label(body,0,1,'Starting scan...');ui.status.TextalignmentH='Centre'
  button(b,0,2,'CancelScan','Cancel & Exit','WLTClose')
 end
@@ -179,7 +182,7 @@ signalTable.WLTUpdate=function()guarded(function()
  MessageBox({title=ok and 'Update results' or 'Update stopped',message=tostring(result),commands={{value=1,name='Close'}}})
  ui.actions={}
  if ui.exitAfterCancel then close();return end
- scan(false)
+ R.refreshInstalled();build(ui.display)
 end)end
 signalTable.WLTMove=function()guarded(function()
  if valid(ui.chooser)then return end
@@ -258,7 +261,7 @@ build=function(display)
 end
 local function metadata()
  safe(function()
-  local p=myHandle:Parent();local appearance=Root().ShowData.Appearances.PluginUpdator_1_1_0
+  local p=myHandle:Parent();local appearance=Root().ShowData.Appearances.PluginUpdator_1_1_1
   if appearance then p.Appearance=appearance end
   local tag
   for _,t in ipairs(ObjectList('Tag Thru')or{})do if R.prop(t,'Name')=='Utility Plugins'then tag=t;break end end

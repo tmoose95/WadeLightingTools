@@ -53,3 +53,5 @@ Independent implementation. No MATools code, licensing system, or branding is in
 MA3 2.5 uses Lua 5.5. Set `WLT_LUA55` to a Lua 5.5 executable, with LuaFileSystem available, before running `python3 tools/validate.py`. The check compiles and launches the exact bundled updater against mocked MA objects, including startup drive scanning. Older Lua interpreters are rejected because they miss the loop-variable compile error corrected in 1.0.2.
 
 The updater is named **WLT Plugin Updator**, including its folder and filenames. Its catalog ID remains stable so existing installations can be recognized.
+
+Version 1.0.3 also corrects the startup GetPath parameter error. The bundled startup checks now validate MA path arguments with no PathType.UserPlugins enum and exercise both internal and removable-drive library resolution.

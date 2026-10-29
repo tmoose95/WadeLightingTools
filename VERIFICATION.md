@@ -40,3 +40,14 @@ Use a copy of the show. Launch with two drives attached and confirm the drive sc
 - All 63 previous scenarios passed under Lua 5.5; two additional checks cover renamed folders/legacy identity and space-encoded Unix/Windows URLs.
 - Name, archive, import XML, Lua, PNG and install folder use WLT Plugin Updator. The icon now uses green circular update arrows, retaining the Wade LT header, download arrow, border and bottom label.
 - Physical console testing remains outstanding.
+
+## WLT Plugin Updator 1.0.3
+
+- Reproduced the console's GetPath wrong-parameter failure in the actual 1.0.2 release with strict API mocks and no PathType.UserPlugins enum.
+- Resolves the running Plugin object's user-library path type using GetPathType(plugin, 1), with the folder-name overload as fallback. Passes a nonempty string to both GetPath and GetPathOverrideFor; no guessed enum index or OS-specific library path.
+- The previous mocks ignored GetPath arguments and invented the missing enum. Path API mocks now check argument types, user content type, plugin handle, noncreating lookup and consistent USB path types.
+- Tests cover the derived path type, absent/empty path-type lookup, unavailable internal path, unavailable USB path, and scan-before-window ordering for both drives.
+- 73 automated checks passed under Lua 5.5: 4 actual-release startup cases, 13 core, 23 runtime, 12 updater UI and 21 unchanged Hippo Remote scenarios.
+- All archive/manifests, XML references, embedded 300 x 300 RGB icon and website links validated.
+- The green circular-update artwork is unchanged. Physical console operation still needs verification.
+- API references: https://help2.malighting.com/grandMA3/2.5/HTML/lua_objectfree_getpathtype.html and https://help2.malighting.com/grandMA3/2.5/HTML/lua_objectfree_getpathoverridefor.html; provided API_Info_Report(2).json confirms the signatures.

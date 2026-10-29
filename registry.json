@@ -160,16 +160,16 @@
   {
     "id": "WadePluginUpdater",
     "name": "WLT Plugin Updator",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "folder": "WLT Plugin Updator",
-    "archive": "WLT Plugin Updator_v1.0.2.zip",
+    "archive": "WLT Plugin Updator_v1.0.3.zip",
     "minimum": "2.5.1.0",
     "note": "Scan connected drives, compare installed/local/online versions, and download or install WadeLightingTools releases. Utility Plugins.",
-    "manifest": "packages/WadePluginUpdater/1.0.2/manifest.tsv",
-    "digest": "b0c98da739d4b31aa1060bbe03759a8fb1a92f005388abc4e2b64172fd0fb758",
-    "xml": "WLT Plugin Updator_v1.0.2.xml",
-    "bytes": 159918,
-    "zip_sha256": "8d7501425fc1a3119d5257b156ba133c7b12bb2eaade3a768a1e1ca719b6620c",
+    "manifest": "packages/WadePluginUpdater/1.0.3/manifest.tsv",
+    "digest": "291b85412ba8c2f3ad349a0b9253cb444749f7a807a1a357ea6770d20d19b78e",
+    "xml": "WLT Plugin Updator_v1.0.3.xml",
+    "bytes": 160254,
+    "zip_sha256": "65bebd152e9c7b65929062ce08bb71d2569821bdd6f0a186913b52544a77c072",
     "image": "WadePluginUpdater.png",
     "summary": "Scan drives, compare versions, and download or install your Wade plugins."
   }

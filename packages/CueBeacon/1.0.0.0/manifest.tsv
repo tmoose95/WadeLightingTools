@@ -1,0 +1,7 @@
+WLT-RELEASE	1	CueBeacon	1.0.0.0	Cue_Beacon_v1.0.0	Cue_Beacon.xml
+FILE	CueBeacon_ReleaseAll.lua	packages/CueBeacon/1.0.0.0/Cue_Beacon_v1.0.0/CueBeacon_ReleaseAll.lua	864	df976032dc7994108b00c9a9615333cf86b7170af6683545c0eec31da9f2025e
+FILE	CueBeacon_Runtime.lua	packages/CueBeacon/1.0.0.0/Cue_Beacon_v1.0.0/CueBeacon_Runtime.lua	2243	73d122609e81dc9fe4514010a52d132c26e29332a3940db860dae6d4da31d83a
+FILE	CueBeacon_Setup.lua	packages/CueBeacon/1.0.0.0/Cue_Beacon_v1.0.0/CueBeacon_Setup.lua	7612	b2d3f4f7f3073380e0e769a69f99aadc9fc4799414ffcacc59eed457df0a6cb9
+FILE	Cue_Beacon.xml	packages/CueBeacon/1.0.0.0/Cue_Beacon_v1.0.0/Cue_Beacon.xml	564	496279d31dfa45e684cd0d70d43b149a5c9629b5670d4c1f7d4f3e7f6cded568
+FILE	README.txt	packages/CueBeacon/1.0.0.0/Cue_Beacon_v1.0.0/README.txt	831	431387c30287d4ed4c25e937250df9ecd44388a71b828b6f2f34cfb450db7078
+ZIP	Cue_Beacon_v1.0.0.zip	releases/Cue_Beacon_v1.0.0.zip	5351	4325976972b2fc0981cd51cffc92ebf1d4d0b70becda2959024f1156a86db662

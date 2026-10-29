@@ -18,10 +18,11 @@ local function control(name)
 end
 local displays={};for i=1,3 do local d=object(nil,'Display');d._index=i;d.W=1920;d.H=1080;d.ScreenOverlay=object(d,'Overlay');displays[i]=d end
 local pools={{Name='Main',_index=1},{Name='Tour',_index=2}}
-local root={ColorTheme={ColorGroups={Button={BackgroundNormal='grey',BackgroundPlease='green',TextPlease='yellow',TextDisabled='lightgrey'},Global={Transparent='clear',Text='white',AlertText='red'}}},ShowData={Appearances={PluginUpdator_1_1_7={}},DataPools=pools}}
+local root={ColorTheme={ColorGroups={Button={BackgroundNormal='grey',BackgroundPlease='green',TextPlease='yellow',TextDisabled='lightgrey'},Global={Transparent='clear',Text='white',AlertText='red'}}},ShowData={Appearances={PluginUpdator_1_1_8={}},DataPools=pools}}
 local R={catalog={{id='ServerCommand',name='Server Command',version='2.3.15',minimum='2.5.1.0'},{id='HippoRemote',name='Hippo Remote',version='1.3.0',minimum='2.5.1.0'}},drives={{path='/usb',label='USB',external=true}},selectedDrives={['/usb']=true},pool=pools[1],online=true,issues={},mode=1,localChoice={},installed={},showInstalled={}}
 R.importNotice='Showfile import is temporarily disabled after a reported console restart.'
 local server=R.catalog[1];local hippo=R.catalog[2]
+R.canDownload=function(p)return true end
 R.installed.ServerCommand={{version='2.3.14',poolName='Main'}};R.showInstalled=R.installed
 local source={version='2.3.14',drive=R.drives[1]};R.localFiles={ServerCommand={source},HippoRemote={source}}
 R.children=function(h)return h end;R.pools=function()return pools end;R.index=function(h)return h._index end;R.prop=function(h,k)return h[k]or''end;R.pause=function()end
@@ -59,7 +60,7 @@ local launch=assert(load(read('updater/src/display.lua')..'\n'..read('updater/sr
 local hits={};for name,fn in pairs(sig)do sig[name]=function(...)hits[name]=true;return fn(...)end end
 local count=0;local function test(name,fn)fn();count=count+1;print('PASS '..name)end
 local function click(name)local c=control(name);assert(sig[c.Clicked],c.Clicked or name);sig[c.Clicked](c)end
-test('Startup scan dialog precedes main UI on caller display',function()launch();assert(events[1]=='scan');assert(plugin.Appearance==root.ShowData.Appearances.PluginUpdator_1_1_7);assert(control('WadePluginUpdater'):Parent()==displays[2].ScreenOverlay);assert(R.allPools)end)
+test('Startup scan dialog precedes main UI on caller display',function()launch();assert(events[1]=='scan');assert(plugin.Appearance==root.ShowData.Appearances.PluginUpdator_1_1_8);assert(control('WadePluginUpdater'):Parent()==displays[2].ScreenOverlay);assert(R.allPools)end)
 test('Every button callback exists; table uses native ScrollBox and ScrollBarV',function()
  for _,c in ipairs(nodes)do if valid(c)and c.Clicked then assert(sig[c.Clicked],c.Clicked)end end
  assert(control('PluginScroll')._class=='ScrollBox');assert(control('PluginScrollbar').ScrollTarget==control('PluginScroll'))
@@ -234,6 +235,22 @@ test('Offline menus keep paused Showfile imports and omit Internet drive downloa
  click('Tab1');answers={{success=true,result=0}};click('Action_ServerCommand')
  assert(#dialogs[#dialogs].commands==3)
  R.online=true;click('Tab2')
+end)
+test('Unknown plugins have no download action; updater remains freely downloadable',function()
+ local oldCheck,oldCatalog,oldVisible=R.canDownload,R.catalog,R.visible
+ R.catalog=dofile('updater/src/core.lua').catalog(read('catalog.tsv'));R.visible=function()return R.catalog end
+ R.canDownload=function(p)return p.id=='WadePluginUpdater'end
+ click('Tab3');answers={{success=true,result=2}};click('Bulk')
+ for _,p in ipairs(R.catalog)do
+  answers={{success=true,result=0}};click('Action_'..p.id)
+  local download=false;for _,cmd in ipairs(dialogs[#dialogs].commands)do if cmd.value==2 then download=true end end
+  assert(download==(p.id=='WadePluginUpdater'))
+  if p.id~='WadePluginUpdater'then
+   answers={{success=true,result=2}};click('Action_'..p.id)
+   assert(control('Action_'..p.id).Text:find('Do Nothing',1,true))
+  end
+ end
+ R.canDownload,R.catalog,R.visible=oldCheck,oldCatalog,oldVisible;click('Tab2')
 end)
 test('Move screen preserves tab and actions; inactive screens disabled',function()
  answers={{success=true,result=2}};click('Bulk')

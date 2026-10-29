@@ -133,6 +133,11 @@ local function setup(options)
  R=Runtime(C,transport,single,function(text,current,total,log)
   if current and total then progress[#progress+1]={text=text,value=current/total,log=log}end
  end,updater,nil,factory)
+ if not options.noPackage then
+  local folder=d1.props.Path..'/plugins/ServerCommand'
+  write(folder..'/Server_Command_v2.3.14.xml','<GMA3><UserPlugin Name="Server Command" Version="2.3.14" Author="Aaron Wade" Path="/ServerCommand"><ComponentLua FileName="Server_Command.lua" /></UserPlugin></GMA3>')
+  write(folder..'/Server_Command.lua','return function()end')
+ end
  R.scan(true)
  progress={}
  return add
@@ -208,7 +213,7 @@ test('Scan never descends into backups, shows, or unrelated directories',functio
  write(base..'/shared/shows/a.xml','<Show/>');write(base..'/plugins/Other/other.xml','<Other/>')
  trace={};R.scan(false)
  for _,v in ipairs(trace) do assert(not v:find('/backups',1,true) and not v:find('/shared',1,true) and not v:find('/Other',1,true)) end
- assert(R.scanStats.xml==0)
+ assert(R.scanStats.xml==1)
 end)
 local function progressCheck(complete)
  assert(progress[1].value==0)
@@ -264,6 +269,34 @@ test('Offline scans still show local packages but do not enable an import',funct
  setup({offline=true});localPackage(drives[2],'2.3.15');R.scan(false)
  assert(not R.online and R.localSource(p).version=='2.3.15')
  assert(not pcall(R.plan,{ServerCommand=3}) and not pcall(R.plan,{ServerCommand=2}))
+ assert(#imports==0 and #calls==0)
+end)
+test('Showfile-only plugin cannot qualify for a download',function()
+ setup({noPackage=true,installed='2.3.14'});trace={}
+ assert(not R.canDownload(p) and not pcall(R.plan,{ServerCommand=2}))
+ assert(#trace==0 and #imports==0 and #calls==0)
+end)
+test('A package on an unselected source drive qualifies for another destination',function()
+ setup();assert(not R.selectedDrives[drives[1].props.Path])
+ assert(R.canDownload(p,true));assert(R.run(R.plan({ServerCommand=2})):match('^OK'))
+end)
+test('Removed source or deleted component rejects a reviewed download before network activity',function()
+ setup();local plan=R.plan({ServerCommand=2});trace={};drives[1].alive=false
+ assert(not pcall(R.run,plan) and #trace==0 and #progress==0)
+ drives[1].alive=true;os.remove(drives[1].props.Path..'/plugins/ServerCommand/Server_Command.lua')
+ assert(not R.canDownload(p) and not pcall(R.run,plan) and #trace==0)
+end)
+test('Empty Lua and changed plugin identity cannot authorize an update',function()
+ setup();local folder=drives[1].props.Path..'/plugins/ServerCommand'
+ write(folder..'/Server_Command.lua','');assert(not pcall(R.plan,{ServerCommand=2}))
+ write(folder..'/Server_Command.lua','return function()end')
+ write(folder..'/Server_Command_v2.3.14.xml','<GMA3><UserPlugin Name="Something Else" Version="2.3.14" Author="Other" /></GMA3>')
+ assert(not R.canDownload(p,true) and not pcall(R.plan,{ServerCommand=2}))
+end)
+test('Free updater downloads with no existing drive copy',function()
+ setup({fullCatalog=true,noPackage=true})
+ local updater;for _,entry in ipairs(R.catalog)do if entry.id=='WadePluginUpdater'then updater=entry end end
+ assert(R.canDownload(updater,true));assert(R.run(R.plan({WadePluginUpdater=2})):match('^OK'))
  assert(#imports==0 and #calls==0)
 end)
 print(count..' runtime containment/download scenarios passed (mock MA environment)')

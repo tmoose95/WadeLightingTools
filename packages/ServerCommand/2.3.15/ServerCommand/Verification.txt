@@ -1,0 +1,37 @@
+Server Command v2.3.15: device rows use grey faces and inset two-pixel membership borders. Source and XML package checks passed. Actual rendering requires console verification.
+
+Earlier functional regression results (v2.3.14):
+Server Command v2.3.14 simulated verification
+PASS console / RESTART APPLICATION
+PASS console / REBOOT DEVICE
+PASS console / SHUT DOWN
+PASS console / DISCONNECT
+PASS console / DISMISS FROM SESSION
+PASS console / INVITE TO SESSION
+PASS console / NETWORK SPEED TEST
+PASS node / RESTART APPLICATION
+PASS node / REBOOT DEVICE
+PASS node / SHUT DOWN
+PASS node / DISCONNECT
+PASS node / DISMISS FROM SESSION
+PASS node / INVITE TO SESSION
+PASS node / NETWORK SPEED TEST
+PASS hippo / SHUTDOWN MACHINE
+PASS hippo / RESTART MACHINE
+PASS hippo / STOP ENGINE HOST
+PASS console / SAVE SHOW local and remote
+PASS console / LOCK DESK local and remote
+PASS console / SAVE TO EXTERNAL DRIVES local and remote
+PASS Selection / Select All / Clear / Cancel
+PASS Tabs / Refresh / Close callbacks
+PASS Move chooser / cancel / retained selection / armed reset
+PASS Preferences / Save / validation atomicity / defaults / all startup tabs / cancel
+PASS onPC discovery / MY STATION / onPC speed-test type
+PASS Changed membership cancels confirmation
+PASS Partial OSC failure resets successful triggers
+PASS Rejected local / remote commands report failure and keep window
+PASS Missing external drive / missing remote reply
+PASS Busy guard / repeated confirm / screen move during send
+PASS Local disruptive actions dispatch after other targets
+PASS all 13 scripted button callbacks exercised
+TOTAL 31 scenarios passed; no real network or filesystem save operations executed

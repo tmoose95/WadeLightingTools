@@ -1,10 +1,11 @@
 -- Callback/UI wiring simulation, without a console or network client.
 local nodes,dialogs,answers,events={},{},{},{}
+local appendFailure
 local function config()return setmetatable({},{__index=function(t,k)local c=config();rawset(t,k,c);return c end})end
 local function object(parent,class)
- local o={_parent=parent,_class=class,_children={}}
- setmetatable(o,{__index=function(t,k)if type(k)=='number'then local c=config();rawset(t,k,c);return c end end})
- function o:Append(kind)local c=object(self,kind);self._children[#self._children+1]=c;nodes[#nodes+1]=c;return c end
+ local o={_parent=parent,_class=class,_children={},_dimensions={}}
+ setmetatable(o,{__newindex=function(t,k,v) if class=='BaseInput' and (k=='W' or k=='H')then t._dimensions[k]=tostring(v)..'px' else rawset(t,k,v)end end,__index=function(t,k)if t._dimensions[k]then return t._dimensions[k]end;if type(k)=='number'then local c=config();rawset(t,k,c);return c end end})
+ function o:Append(kind)if appendFailure and kind=='TitleBar' and self.Name=='WLTUpdating'then error('Simulated popup setup failure')end;local c=object(self,kind);self._children[#self._children+1]=c;nodes[#nodes+1]=c;return c end
  function o:Parent()return self._parent end
  function o:ToAddr()return 'DataPool 1 Plugin 13'end
  return o
@@ -17,7 +18,7 @@ local function control(name)
 end
 local displays={};for i=1,3 do local d=object(nil,'Display');d._index=i;d.W=1920;d.H=1080;d.ScreenOverlay=object(d,'Overlay');displays[i]=d end
 local pools={{Name='Main',_index=1},{Name='Tour',_index=2}}
-local root={ColorTheme={ColorGroups={Button={BackgroundNormal='grey',BackgroundPlease='green',TextPlease='yellow',TextDisabled='lightgrey'},Global={Transparent='clear',Text='white',AlertText='red'}}},ShowData={Appearances={PluginUpdator_1_1_4={}},DataPools=pools}}
+local root={ColorTheme={ColorGroups={Button={BackgroundNormal='grey',BackgroundPlease='green',TextPlease='yellow',TextDisabled='lightgrey'},Global={Transparent='clear',Text='white',AlertText='red'}}},ShowData={Appearances={PluginUpdator_1_1_5={}},DataPools=pools}}
 local R={catalog={{id='ServerCommand',name='Server Command',version='2.3.15',minimum='2.5.1.0'},{id='HippoRemote',name='Hippo Remote',version='1.3.0',minimum='2.5.1.0'}},drives={{path='/usb',label='USB',external=true}},selectedDrives={['/usb']=true},pool=pools[1],online=true,issues={},mode=1,localChoice={},installed={},showInstalled={}}
 local server=R.catalog[1];local hippo=R.catalog[2]
 R.installed.ServerCommand={{version='2.3.14',poolName='Main'}};R.showInstalled=R.installed
@@ -53,7 +54,7 @@ local launch=assert(load(read('updater/src/display.lua')..'\n'..read('updater/sr
 local hits={};for name,fn in pairs(sig)do sig[name]=function(...)hits[name]=true;return fn(...)end end
 local count=0;local function test(name,fn)fn();count=count+1;print('PASS '..name)end
 local function click(name)local c=control(name);assert(sig[c.Clicked],c.Clicked or name);sig[c.Clicked](c)end
-test('Startup scan dialog precedes main UI on caller display',function()launch();assert(events[1]=='scan');assert(plugin.Appearance==root.ShowData.Appearances.PluginUpdator_1_1_4);assert(control('WadePluginUpdater'):Parent()==displays[2].ScreenOverlay);assert(R.allPools)end)
+test('Startup scan dialog precedes main UI on caller display',function()launch();assert(events[1]=='scan');assert(plugin.Appearance==root.ShowData.Appearances.PluginUpdator_1_1_5);assert(control('WadePluginUpdater'):Parent()==displays[2].ScreenOverlay);assert(R.allPools)end)
 test('Every button callback exists; table uses native ScrollBox and ScrollBarV',function()
  for _,c in ipairs(nodes)do if valid(c)and c.Clicked then assert(sig[c.Clicked],c.Clicked)end end
  assert(control('PluginScroll')._class=='ScrollBox');assert(control('PluginScrollbar').ScrollTarget==control('PluginScroll'))
@@ -177,6 +178,34 @@ test('Unexpected update error closes progress without forcing completion',functi
  local stops=progressStops;answers={{success=true,result=1},{success=true,result=1}};click('Update')
  assert(progressValues[#progressValues]==650 and progressStops==stops+1)
  assert(not pcall(control,'WLTUpdating') and control('WadePluginUpdater'));R.run=old
+end)
+test('Progress popup setup failure clears busy state and partial window before import',function()
+ answers={{success=true,result=1}};click('Action_ServerCommand')
+ local before=ran;appendFailure=true
+ answers={{success=true,result=1}};click('Update');appendFailure=false
+ assert(ran==before and dialogs[#dialogs].message:find('Simulated popup setup failure',1,true))
+ assert(not pcall(control,'WLTUpdating'));click('Tab3');assert(control('Tab3').State==1);click('Tab1')
+end)
+test('Updater offers drive plus showfile, download-only and offline import actions',function()
+ local oldVisible=R.visible
+ local own={id='WadePluginUpdater',name='WLT Plugin Updator',version='1.1.5',minimum='2.5.1.0'}
+ R.catalog[#R.catalog+1]=own;R.visible=function()return {own}end
+ R.localFiles.WadePluginUpdater={source};R.installed.WadePluginUpdater={{version='1.1.4'}}
+ click('Tab1');answers={{success=true,result=1}};click('Action_WadePluginUpdater')
+ local cmds=dialogs[#dialogs].commands;local available={};for _,c in ipairs(cmds)do available[c.value]=c.name end
+ assert(available[1]=='Update Drives + Showfile' and available[2] and available[3])
+ assert(control('Action_WadePluginUpdater').Text:find('Update Drives + Showfile',1,true))
+ answers={{success=true,result=1}};click('Bulk');assert(control('Action_WadePluginUpdater').Text:find('Update Drives + Showfile',1,true))
+ local oldRun=R.run;local queued={}
+ env.CmdIndirect=function(command)
+  assert(not pcall(control,'WadePluginUpdater') and not pcall(control,'WLTUpdating'),'Old plugin UI must close before self replacement')
+  queued[#queued+1]=command
+ end
+ R.run=function()return 'READY',{command='LuaFile "/temporary/FinishUpdate.lua"'}end
+ answers={{success=true,result=0}};click('Update');assert(#queued==0)
+ answers={{success=true,result=1}};click('Update');assert(#queued==1 and queued[1]=='LuaFile "/temporary/FinishUpdate.lua"')
+ R.run=oldRun;R.visible=oldVisible;table.remove(R.catalog);R.localFiles.WadePluginUpdater=nil;R.installed.WadePluginUpdater=nil
+ launch();click('Tab1')
 end)
 test('Move screen preserves tab and actions; inactive screens disabled',function()
  click('Tab2');answers={{success=true,result=3}};click('Action_HippoRemote');click('Move');assert(control('Display4').Enabled=='No');click('CancelMove')

@@ -17,7 +17,7 @@ local function obj(properties,n)
    for filename,data in pairs(self.imported.files) do write(path..'/'..filename,data) end
    return true
   end
-  write(path..'/'..name,'<GMA3><UserPlugin Name="'..self.props.Name..'" Author="Aaron Wade" Version="'..self.props.Version..'" Path="/ServerCommand"><ComponentLua FileName="original.lua" /></UserPlugin></GMA3>')
+  write(path..'/'..name,'<GMA3><UserPlugin Name="'..self.props.Name..'" Author="Aaron Wade" Version="'..self.props.Version..'" Path="'..self.props.Path..'"><ComponentLua FileName="original.lua" /></UserPlugin></GMA3>')
   if not self.missingBackup then write(path..'/original.lua',self.emptyBackup and '' or 'return function() end')end;return true
  end
  return o
@@ -27,10 +27,21 @@ local function test(name,fn)fn();count=count+1;print('PASS '..name)end
 local catalogText=assert(read('catalog.tsv'))
 local all=C.catalog(catalogText);local p;for _,v in ipairs(all)do if v.id=='ServerCommand'then p=v end end
 local single='WLT-CATALOG\t1\n'..table.concat({'PLUGIN',p.id,p.name,p.version,p.minimum,p.folder,p.manifest,p.digest},'\t')..'\n'
-local root,pool,drives,R,trace,mode,calls,imports,progress,repairs
+local root,pool,drives,R,trace,mode,calls,imports,progress,repairs,timers,workerProgress
+local Worker=dofile('updater/src/self_update.lua')
+local function factory(job)return Worker.script(job,read('updater/src/core.lua'),read('updater/src/self_update.lua'))end
 local function setup(options)
  options=options or {};local path=home..'/case'..(count+1);mkdir(path)
- trace={};calls={};imports={};progress={};repairs={};mode=options
+ trace={};calls={};imports={};progress={};repairs={};timers={};workerProgress={};mode=options
+ local handles={};local handlesById={}
+ function HandleToStr(h)if not handles[h]then local id='H#'..(#handlesById+1);handlesById[#handlesById+1]=h;handles[h]=id end;return handles[h]end
+ function StrToHandle(id)return handlesById[tonumber(id:match('H#(%d+)'))]end
+ function CmdIndirect()end
+ function Timer(fn)if options.timerFail then error('Timer unavailable')end;timers[#timers+1]=fn end
+ function StartProgress()return 42 end;function StopProgress()workerProgress.stopped=true end
+ function SetProgressRange(_,lo,hi)assert(lo==0 and hi==1000)end
+ function SetProgress(_,value)workerProgress[#workerProgress+1]=value end
+ function SetProgressText()end
  local d1=obj({Name='Internal',Path=path..'/internal',DriveType='Harddisk'},1)
  local d2=obj({Name='USB A',Path=path..'/usb-a',DriveType='Removeable'},2)
  local d7=obj({Name='USB B',Path=path..'/usb-b',DriveType='Removable'},7)
@@ -84,7 +95,7 @@ local function setup(options)
    -- not resolve external FileName beside this XML, even when that file exists.
    if #m.components>0 then self.resourceMissing=true;return true end
    if options.noReadback then return true end
-   self.props.Name=m.Name;self.props.Version=m.Version;self.props.Path=m.Path
+   self.props.Name=m.Name;self.props.Version=m.Version;self.props.Path=m.Path;self.props.Author=m.Author
    if options.normalizedVersion then self.props.Version=m.Version..'.0' end
    self.imported={xml=xml,files={}}
    if options.staleCode then
@@ -99,6 +110,7 @@ local function setup(options)
  end
  if options.installed then add(13,options.installed)end
  if options.two then add(26,options.installed)end
+ if options.selfInstalled then updater=add(12,'1.1.4');updater.props.Name='WLT Plugin Updator';updater.props.Path='/WLT Plugin Updator' end
  function Cmd(command)
   calls[#calls+1]=command
   local n,slot=command:match('^Store DataPool (%d+) Plugin (%d+) /NoConfirmation$')
@@ -120,7 +132,7 @@ local function setup(options)
  end
  R=Runtime(C,transport,single,function(text,current,total,log)
   if current and total then progress[#progress+1]={text=text,value=current/total,log=log}end
- end,updater)
+ end,updater,nil,factory)
  R.scan(true)
  progress={}
  return add
@@ -400,5 +412,72 @@ test('Invalid replacement never prompts repair or changes an empty slot',functio
  setup({offline=true,installed='2.3.14',repair=true});pool.Plugins[13].emptyBackup=true
  local folder=localPackage(drives[2],'2.3.15');R.scan(false);write(folder..'/Server_Command.lua','broken Lua (')
  assert(R.run(R.plan({ServerCommand=3})):match('^FAILED'));assert(#repairs==0 and #imports==0)
+end)
+local function executeHandoff(handoff)
+ assert(handoff and handoff.command=='LuaFile "'..handoff.path..'"')
+ assert(load(read(handoff.path),'@FinishUpdate.lua','t',_G))()
+ local limit=10000
+ while #timers>0 do limit=limit-1;assert(limit>0,'Worker did not finish');table.remove(timers,1)()end
+ return read(handoff.path:gsub('FinishUpdate.lua$','Result.txt')) or ''
+end
+local function prepareSelf(options)
+ options=options or {};options.fullCatalog=true;options.selfInstalled=true;setup(options)
+ return R.plan({WadePluginUpdater=1})
+end
+test('Self update writes drives then queues independent worker without inline Import',function()
+ local plan=prepareSelf();local result,handoff=R.run(plan)
+ assert(result:match('^READY') and handoff,result);assert(#imports==0)
+ assert(read(drives[2].props.Path..'/plugins/WLT Plugin Updator/WLT Plugin Updator.lua'))
+ assert(read(plan.items[1].slots[1].backup..'/original.lua'));progressCheck(false)
+ local out=executeHandoff(handoff);assert(out:match('^OK'),out)
+ assert(#imports==1 and imports[1].slot==12 and pool.Plugins[12].props.Version=='1.1.5')
+ assert(workerProgress.stopped and workerProgress[#workerProgress]==1000)
+end)
+test('Self download-only action never imports or creates a worker',function()
+ prepareSelf();local result,handoff=R.run(R.plan({WadePluginUpdater=2}))
+ assert(result:match('^OK') and not handoff and #imports==0);progressCheck(true)
+end)
+test('Self import from drive works offline with no network after review',function()
+ prepareSelf();assert(R.run(R.plan({WadePluginUpdater=2})):match('^OK'))
+ R.online=false;R.mode=3;trace={};local result,handoff=R.run(R.plan({WadePluginUpdater=3}))
+ assert(result:match('^READY'),result);assert(executeHandoff(handoff):match('^OK'))
+ for _,entry in ipairs(trace)do assert(not entry:match('^http:'))end
+end)
+test('Self continuation runs last after other plugins and retains earlier results',function()
+ prepareSelf({installed='2.3.14'});local plan=R.plan({WadePluginUpdater=1,ServerCommand=1})
+ assert(plan.items[#plan.items].plugin.id=='WadePluginUpdater')
+ local result,handoff=R.run(plan);assert(#imports==1 and imports[1].slot==13,result)
+ local out=executeHandoff(handoff);assert(out:find('OK: Server Command',1,true) and out:find('OK: WLT Plugin Updator',1,true),out)
+end)
+test('Self continuation supports multiple DataPools and an empty target',function()
+ prepareSelf();local second=obj({Name='Empty'},2);second.Plugins=obj();root.ShowData.DataPools.list[#root.ShowData.DataPools.list+1]=second
+ R.allPools=true;local result,handoff=R.run(R.plan({WadePluginUpdater=1}))
+ assert(result:match('^READY'),result);local out=executeHandoff(handoff);assert(not out:find('FAILED',1,true),out)
+ assert(#imports==2 and second.Plugins[1].props.Name=='WLT Plugin Updator' and pool.Plugins[12].props.Version=='1.1.5')
+end)
+test('Changed prepared self XML is rejected before pool import',function()
+ local _,handoff=R.run(prepareSelf());local xml=handoff.path:gsub('FinishUpdate.lua$','Plugin.xml');write(xml,read(xml)..' ')
+ local out=executeHandoff(handoff);assert(out:find('Prepared updater XML changed',1,true),out);assert(#imports==0 and workerProgress[#workerProgress]<1000)
+end)
+test('Changed target metadata after self review blocks replacement',function()
+ local _,handoff=R.run(prepareSelf());pool.Plugins[12].props.Name='User changed name'
+ local out=executeHandoff(handoff);assert(out:find('changed after review',1,true),out);assert(#imports==0)
+end)
+test('Lock set after self review blocks replacement',function()
+ local _,handoff=R.run(prepareSelf());pool.Plugins[12].props.Lock='Yes'
+ local out=executeHandoff(handoff);assert(out:find('Updater slot is locked',1,true),out);assert(#imports==0)
+end)
+test('Stale self Lua readback fails and never announces 100 percent',function()
+ local _,handoff=R.run(prepareSelf({staleCode=true}));local out=executeHandoff(handoff)
+ assert(out:find('Updated updater Lua differs',1,true),out);assert(workerProgress.stopped and workerProgress[#workerProgress]<1000)
+end)
+test('Self worker is one-shot and cannot accidentally reapply',function()
+ local _,handoff=R.run(prepareSelf());assert(executeHandoff(handoff):match('^OK'))
+ local before=#imports;executeHandoff(handoff);assert(#imports==before)
+ assert(repairs[#repairs].message:find('already run',1,true))
+end)
+test('Self timer scheduling failure closes progress and leaves showfile untouched',function()
+ local _,handoff=R.run(prepareSelf({timerFail=true}));local out=executeHandoff(handoff)
+ assert(out:find('Timer unavailable',1,true),out);assert(#imports==0 and workerProgress.stopped and workerProgress[#workerProgress]<1000)
 end)
 print(count..' runtime scenarios passed (mock MA environment)')

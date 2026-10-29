@@ -1,12 +1,12 @@
-PLUGIN UPDATOR v1.0.1
+WLT PLUGIN UPDATOR v1.0.2
 Aaron Wade - Crossfade Design
 Target: grandMA3 2.5.1.0 and later 2.5 releases
 
 INSTALL
 1. Extract this archive.
-2. Copy WadePluginUpdater to grandMA3/gma3_library/datapools/plugins/ on USB.
+2. Copy WLT Plugin Updator to grandMA3/gma3_library/datapools/plugins/ on USB.
 3. Edit an empty plugin pool slot, select your USB drive, and import
-   PluginUpdator_v1.0.1.xml from the WadePluginUpdater folder.
+   WLT Plugin Updator_v1.0.2.xml from the WLT Plugin Updator folder.
 4. Run the plugin. It scans connected drives BEFORE opening the main window.
 
 WORKFLOW
@@ -56,7 +56,7 @@ not silently overwritten. The batch stops at the first failure and lists the
 result; completed updates are not rolled back automatically.
 
 The updater does not update its own running plugin in place. Use
-Download Only for Plugin Updator, close it, then import its new XML manually.
+Download Only for WLT Plugin Updator, close it, then import its new XML manually.
 Utility Plugins is assigned at runtime; no incompatible XML Tags field is used.
 The embedded pool image is 300 x 300 RGB PNG with 1024-byte image blocks.
 
@@ -67,8 +67,9 @@ scroll gestures and display movement must still be checked on the console.
 This is an independent implementation of a batch updater workflow. It does not
 use MATools code, licenses, account services or branding.
 
-REVISION 1.0.1
-Renamed to Plugin Updator. The pool icon includes small Wade LT text at the top
-center. The existing WadePluginUpdater folder and catalog ID are retained so
-previous installations continue to match. Import the new XML into the existing
-updater slot after closing the old window.
+REVISION 1.0.2
+Fixes Lua 5.5 compile failures caused by assigning to loop variables.
+Plugin, folder and file names are WLT Plugin Updator. The pool artwork uses a green circular update symbol in the center.
+Close the previous updater and import WLT Plugin Updator_v1.0.2.xml into its
+existing plugin slot. The catalog ID is retained and previous updater names
+and folders are recognized.

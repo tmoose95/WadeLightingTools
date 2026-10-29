@@ -208,6 +208,28 @@ return function(Core,Transport,bootstrap,notify,plugin,trustBundle,selfUpdateFac
   end
   return R.localBest(p,true)
  end
+ function R.canDownload(p,verify)
+  -- The updater is free. Other entries need a recognizable, complete package
+  -- on a currently connected scanned drive, including internal storage.
+  -- Presence is update eligibility, not proof of purchase or a license check.
+  if p.id=='WadePluginUpdater' then return true end
+  for _,e in ipairs(R.localFiles[p.id] or {})do
+   if driveValid(e.drive) and exists(e.path) then
+    local complete=true
+    for _,f in ipairs(e.meta.components)do if not exists(join(e.folder,f))then complete=false;break end end
+    if complete and verify then
+     complete=safe(function()
+      local xml=assert(read(e.path,16777216));local m=Core.xml(xml)
+      assert(Core.matches(m,p) and m.Version==e.version)
+      Core.luaContents(xml,function(f)return read(join(e.folder,f))end)
+      return true
+     end,false)
+    end
+    if complete then return true,e end
+   end
+  end
+  return false
+ end
  function R.installedText(p,all)
   local a=(all and R.showInstalled or R.installed)[p.id] or {};if #a==0 then return 'Not installed' end
   local t={};for _,x in ipairs(a) do t[#t+1]=(x.version~='' and x.version or '?')..' ('..x.poolName..')' end
@@ -267,6 +289,7 @@ return function(Core,Transport,bootstrap,notify,plugin,trustBundle,selfUpdateFac
   for _,p in ipairs(R.catalog) do if selected[p.id] and selected[p.id]~=0 then
    local mode=type(selected[p.id])=='number' and selected[p.id] or R.mode
    assert(mode==2,IMPORT_PAUSED)
+   assert(R.canDownload(p,true),'Not found on your drives: '..p.name..'. Open its plugin page for information. Only WLT Plugin Updator can be downloaded without an existing drive copy.')
    local source=mode==3 and R.localSource(p) or nil
    assert(mode==3 or R.online,'Online catalog is unavailable. Reconnect and rescan before downloading.')
    assert(mode~=3 or source,'No complete local package on a selected drive: '..p.name)
@@ -444,7 +467,10 @@ return function(Core,Transport,bootstrap,notify,plugin,trustBundle,selfUpdateFac
  end
  function R.run(plan)
   -- Validate the entire batch before progress, backup, download or pool changes.
-  for _,item in ipairs(plan.items or {})do assert(item.mode==2,IMPORT_PAUSED)end
+  for _,item in ipairs(plan.items or {})do
+   assert(item.mode==2,IMPORT_PAUSED)
+   assert(R.canDownload(item.plugin,true),'Plugin is no longer available on a connected drive: '..item.plugin.name..'. No downloads started; rescan your drives.')
+  end
   R.cancel=false;local results={};local completed=0;local handoff
   progress={item=1,count=#plan.items,start=0,span=0,value=0,text='Starting update'}
   report('Starting update',0,1000)
@@ -461,6 +487,7 @@ return function(Core,Transport,bootstrap,notify,plugin,trustBundle,selfUpdateFac
      for i,slot in ipairs(item.slots) do pulse();backupSlot(item,slot);advance(i/#item.slots) end
     end
     if item.mode~=3 then
+     assert(R.canDownload(item.plugin,true),'Plugin is no longer available on a connected drive: '..item.plugin.name)
      phase(item.mode==2 and 0 or .1,downloadEnd,'Downloading '..item.plugin.name)
      local m,data,zip=release(item.plugin);local sources={}
      phase(downloadEnd,saveEnd,'Saving '..item.plugin.name)

@@ -1,5 +1,5 @@
 -- Native MA3 table UI. Every action is staged for review before file/show changes.
-local VERSION='1.1.7'
+local VERSION='1.1.8'
 local ui={actions={{},{},{}},busy=false,tab=1,cells={},activity={}}
 local R,build,scan
 local function valid(h) return h and safe(function()return IsObjectValid(h)end,false) end
@@ -144,12 +144,12 @@ signalTable.WLTAction=function(c)guarded(function()
   commands[#commands+1]={value=3,name='Import from Drive (paused)'}
   commands[#commands+1]={value=1,name='Import from Internet (paused)'}
  elseif ui.tab==2 then
-  if R.online then commands[#commands+1]={value=2,name=ACTIONS[2]}end
+  if R.online and R.canDownload(p)then commands[#commands+1]={value=2,name=ACTIONS[2]}end
  else
   commands[#commands+1]={value=1,name='Import from Internet (paused)'}
-  if R.online then commands[#commands+1]={value=2,name=ACTIONS[2]}end
+  if R.online and R.canDownload(p)then commands[#commands+1]={value=2,name=ACTIONS[2]}end
  end
- local message=ui.tab==1 and R.importNotice or 'Download the online release to the selected drives. Showfile objects are not changed.'
+ local message=ui.tab==1 and R.importNotice or (R.canDownload(p)and 'Download the online release to the selected drives. Showfile objects are not changed.'or 'This plugin was not found on your drives. Open its page with QR Code for information. Downloads are available only for plugins already on a drive; WLT Plugin Updator is free.')
  local a=MessageBox({title=p.name..' - Action',message=message,commands=commands})
  if not a or not a.success then return end
  local allowed=false;for _,cmd in ipairs(commands)do if cmd.value==a.result then allowed=true end end
@@ -164,7 +164,7 @@ signalTable.WLTBulk=function()guarded(function()
  if a.result==1 then
   if ui.tab==1 then importNotice();return end
   for _,p in ipairs(R.visible(ui.tab))do
-   if R.online then
+   if R.online and R.canDownload(p)then
     local localCopy=R.localSource(p)
     if (localCopy and R.versionStateFor(p,localCopy.version)=='outdated') or (ui.tab==3 and not localCopy)then
      actions()[p.id]=2
@@ -337,7 +337,7 @@ build=function(display)
 end
 local function metadata()
  safe(function()
-  local p=myHandle:Parent();local appearance=Root().ShowData.Appearances.PluginUpdator_1_1_7
+  local p=myHandle:Parent();local appearance=Root().ShowData.Appearances.PluginUpdator_1_1_8
   if appearance then p.Appearance=appearance end
   local tag
   for _,t in ipairs(ObjectList('Tag Thru')or{})do if R.prop(t,'Name')=='Utility Plugins'then tag=t;break end end

@@ -10,7 +10,7 @@ return function(Core, env)
   local bytes={}
   for _,cp in utf8.codes(s) do
    if cp<=65535 then bytes[#bytes+1]=string.pack('<I2',cp) else
-    cp=cp-65536;bytes[#bytes+1]=string.pack('<I2I2',0xd800+(cp>>10),0xdc00+(cp&1023))
+    local adjusted=cp-65536;bytes[#bytes+1]=string.pack('<I2I2',0xd800+(adjusted>>10),0xdc00+(adjusted&1023))
    end
   end
   return Core.base64(table.concat(bytes))
@@ -43,7 +43,8 @@ return function(Core, env)
   local job=env.work..'/http_'..tostring(os.time())..'_'..serial
   assert(env.mkdir(job),'Could not create download workspace')
   local body,done,err,kind=job..'/payload',job..'/done',job..'/error',job..'/kind'
-  local url=PREFIX..remote
+  local requestPath=remote:gsub(' ','%%20')
+  local url=PREFIX..requestPath
   if env.windows then
    local script="$ErrorActionPreference='Stop';try{[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;"
     .."$r=[Net.HttpWebRequest]::Create("..ps(url)..");$r.Timeout=30000;$r.ReadWriteTimeout=30000;$r.AllowAutoRedirect=$false;"
@@ -57,7 +58,7 @@ return function(Core, env)
    assert(result==true or result==0,'Could not start HTTPS downloader')
   else
    local request=job..'/request'
-   assert(env.write(request,'GET /tmoose95/WadeLightingTools/main/'..remote..' HTTP/1.0\r\nHost: raw.githubusercontent.com\r\nUser-Agent: WadeLightingTools/1.0.0\r\nConnection: close\r\n\r\n'))
+   assert(env.write(request,'GET /tmoose95/WadeLightingTools/main/'..requestPath..' HTTP/1.0\r\nHost: raw.githubusercontent.com\r\nUser-Agent: WadeLightingTools/1.0.0\r\nConnection: close\r\n\r\n'))
    local script='#!/bin/sh\n'..'ulimit -f '..math.ceil((limit+131072)/512)..' 2>/dev/null || true\n'
     ..'if command -v curl >/dev/null 2>&1; then\n'
     ..' curl --fail --silent --show-error --proto "=https" --connect-timeout 8 --max-time 30 --max-filesize '..limit..' --output '..sh(body)..' '..sh(url)..' 2>'..sh(err)..'\n rc=$?\n echo body >'..sh(kind)..'\n'

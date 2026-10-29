@@ -52,8 +52,8 @@ function M.compare(a,b)
 end
 function M.key(s) return tostring(s or ''):lower():gsub('[^a-z0-9]','') end
 function M.path(s)
- if type(s)~='string' or #s==0 or #s>240 or s:find('[^%w_./%-]') or s:sub(1,1)=='/' or s:find('//',1,true) then return false end
- for part in s:gmatch('[^/]+') do if part=='.' or part=='..' or #part>100 then return false end end
+ if type(s)~='string' or #s==0 or #s>240 or s:find('[^%w_./%- ]') or s:sub(1,1)=='/' or s:find('//',1,true) then return false end
+ for part in s:gmatch('[^/]+') do if part=='.' or part=='..' or #part>100 or part:find('^ ') or part:find(' $') then return false end end
  return s:sub(-1)~='/'
 end
 function M.id(s) return type(s)=='string' and #s<=64 and s:match('^[A-Za-z][A-Za-z0-9_%-]*$')~=nil end
@@ -62,8 +62,8 @@ function M.fields(s)
 end
 local function rows(text,limit)
  if type(text)~='string' or #text>limit or text:find('\0',1,true) then error('Invalid or oversized catalog') end
- local r={};for line in text:gmatch('[^\n]+') do
-  line=line:gsub('\r$','')
+ local r={};for rawLine in text:gmatch('[^\n]+') do
+  local line=rawLine:gsub('\r$','')
   if #line>2048 then error('Catalog line too long') end
   r[#r+1]=M.fields(line)
  end;return r
@@ -128,7 +128,9 @@ end
 function M.matches(meta,plugin)
  if not meta then return false end
  local folder=(meta.Path or ''):gsub('^/',''):gsub('/$','')
- return (M.key(meta.Name)==M.key(plugin.name) or M.key(folder)==M.key(plugin.folder))
+ local legacyUpdater=plugin.id=='WadePluginUpdater' and
+  (M.key(folder)=='wadepluginupdater' or M.key(meta.Name)=='wadepluginupdater')
+ return (M.key(meta.Name)==M.key(plugin.name) or M.key(folder)==M.key(plugin.folder) or legacyUpdater)
   and (meta.Author or ''):lower():find('aaron wade',1,true)~=nil
 end
 function M.base64(s)

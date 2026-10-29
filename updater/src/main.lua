@@ -1,5 +1,5 @@
 -- UI entry point. Core, Transport, Runtime, button and display helpers are bundled above.
-local VERSION='1.0.1'
+local VERSION='1.0.2'
 local ui={selected={},busy=false}
 local R
 local build
@@ -14,7 +14,7 @@ local function close()
  remove(ui.chooser);remove(ui.base);ui.chooser=nil;ui.base=nil
  if _G.__WadeLightingToolsWindow==ui then _G.__WadeLightingToolsWindow=nil end
 end
-local function errorbox(err) MessageBox({title='Plugin Updator',message=tostring(err),commands={{value=1,name='OK'}}}) end
+local function errorbox(err) MessageBox({title='WLT Plugin Updator',message=tostring(err),commands={{value=1,name='OK'}}}) end
 local function guarded(fn)
  if ui.busy then return end
  local ok,err=pcall(fn);if not ok then ui.busy=false;errorbox(err) end
@@ -111,7 +111,7 @@ build=function(display)
  base[1][1].SizePolicy='Fixed';base[1][1].Size='54';base[1][2].SizePolicy='Stretch'
  local title=base:Append('TitleBar');title.Columns=3;title.Rows=1;title.Anchors='0,0'
  title[2][2].SizePolicy='Fixed';title[2][2].Size='54';title[2][3].SizePolicy='Fixed';title[2][3].Size='54'
- local name=title:Append('TitleButton');name.Anchors='0,0';name.Text='PLUGIN UPDATOR  v'..VERSION;name.Texture='corner1';name.Font='Regular18'
+ local name=title:Append('TitleButton');name.Anchors='0,0';name.Text='WLT PLUGIN UPDATOR  v'..VERSION;name.Texture='corner1';name.Font='Regular18'
  display_icon(button(title,1,0,'Move','','WLTMove'))
  local x=title:Append('CloseButton');x.Anchors='2,0';x.Texture='corner2';x.PluginComponent=myHandle;x.Clicked='WLTClose'
  local frame=base:Append('DialogFrame');frame.Columns=1;frame.Rows=6;frame.Anchors='0,1'
@@ -154,7 +154,7 @@ build=function(display)
 end
 local function metadata()
  safe(function()
-  local p=myHandle:Parent();local appearance=Root().ShowData.Appearances.PluginUpdator_1_0_1
+  local p=myHandle:Parent();local appearance=Root().ShowData.Appearances.PluginUpdator_1_0_2
   if appearance then p.Appearance=appearance end
   local tag
   for _,t in ipairs(ObjectList('Tag Thru') or {})do if R.prop(t,'Name')=='Utility Plugins' then tag=t;break end end

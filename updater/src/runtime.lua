@@ -40,7 +40,7 @@ return function(Core,Transport,bootstrap,notify)
  local transport=Transport(Core,{work=work,windows=tostring(HostOS()):lower():find('windows',1,true)~=nil,
   mkdir=mkdir,write=write,read=read,exists=exists,now=now,pause=pause,cancelled=function()return R.cancel end})
  R.prop,R.index,R.valid,R.children,R.pause=prop,index,valid,children,pause
- local function report(text) notify(text);Printf('Plugin Updator | %s',text) end
+ local function report(text) notify(text);Printf('WLT Plugin Updator | %s',text) end
  local function issue(text) R.issues[#R.issues+1]=text;report(text) end
  local function driveValid(d)
   return valid(d.handle) and index(d.handle)==d.number and prop(d.handle,'Path')==d.path

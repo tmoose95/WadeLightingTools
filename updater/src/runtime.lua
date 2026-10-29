@@ -369,11 +369,23 @@ return function(Core,Transport,bootstrap,notify,plugin,trustBundle)
    assert(exists(join(path,f)) or exists(join(join(path,(meta.Path or ''):gsub('^/','')),f)),
     'Backup is missing an external Lua component; original plugin was not replaced. '..path)
   end
+  -- Embedded-only exports are valid backups too; verify their actual Lua.
+  local backupXML=read(join(path,filename),16777216)
+  Core.luaContents(backupXML,function(f)
+   return read(join(path,f)) or read(join(join(path,(meta.Path or ''):gsub('^/','')),f))
+  end)
   report('Show plugin backup: '..path)
   slot.backup=path
  end
  local function install(item,source,plan)
   validateLocal(source,item.plugin)
+  local original=assert(read(source.path,16777216),'Import XML no longer exists')
+  local embedded,expectedCodes=Core.embeddedPlugin(original,function(f)return read(join(source.folder,f))end,pulse)
+  local importFolder=join(work,'import_'..unique())
+  assert(mkdir(importFolder),'Cannot create self-contained import workspace')
+  local importName='Plugin.xml'
+  assert(write(join(importFolder,importName),embedded),'Could not write self-contained import XML')
+  assert(read(join(importFolder,importName),16777216)==embedded,'Import XML readback differs')
   assert(valid(plan.pool) and index(plan.pool)==plan.poolNumber,'Destination DataPool changed')
   for _,slot in ipairs(item.slots) do
    assert(valid(slot.pool) and index(slot.pool)==slot.poolNumber,'Destination DataPool changed')
@@ -393,32 +405,33 @@ return function(Core,Transport,bootstrap,notify,plugin,trustBundle)
    local recovery=' Backup: '..tostring(slot.backup or 'new slot')
    assert(valid(target),'Could not create import target at '..where..recovery)
    report('Importing '..item.plugin.name..' into '..where)
-   -- Import the XML directly into its target handle. Library keyword lookup
-   -- consults libcache.dat and can report OK without replacing the plugin.
-   -- MA's object API accepts the absolute directory and returns a boolean.
-   assert(target:Import(source.folder,source.xml),
-    'Native object import failed at '..where..' from '..source.path..recovery)
+   -- The object API can resolve external FileName against lib_plugins instead
+   -- of this USB/library folder. Import verified embedded FileContent instead.
+   assert(target:Import(importFolder,importName),
+    'Native object import failed at '..where..' from '..join(importFolder,importName)..recovery)
    local untilTime=now()+3;local found
    repeat
     pause(.05);found=slot.pool.Plugins[slot.slot]
-    if valid(found) and prop(found,'Version')==item.version then break end
+    if valid(found) and Core.compare(prop(found,'Version'),item.version)==0 then break end
    until now()>=untilTime
-   assert(valid(found) and Core.matches(pluginMeta(found),item.plugin) and prop(found,'Version')==item.version,
-    'Imported metadata was not verified at '..where..recovery)
+   local actual=pluginMeta(found)
+   assert(valid(found) and Core.matches(actual,item.plugin) and Core.compare(actual.Version,item.version)==0,
+    'Imported metadata differs at '..where..': expected '..item.plugin.name..' '..item.version..
+    '; found '..actual.Name..' '..actual.Version..' / Author '..actual.Author..' / Path '..actual.Path..recovery)
    -- A version alone cannot prove that the Lua component was replaced.
    local check=join(work,'verify_'..unique())
    assert(mkdir(check),'Cannot create import verification folder'..recovery)
    assert(found:Export(check,'Plugin.xml'),'Cannot verify imported Lua at '..where..recovery)
-   local exported=Core.xml(read(join(check,'Plugin.xml'),16777216))
-   assert(exported and #exported.components==#source.meta.components and #exported.components>0,
-    'Imported Lua component count differs at '..where..recovery)
+   local exportedXML=read(join(check,'Plugin.xml'),16777216)
+   local exported=assert(Core.xml(exportedXML),'Imported export could not be read'..recovery)
+   local actualCodes=Core.luaContents(exportedXML,function(f)
+    return read(join(check,f)) or read(join(join(check,(exported.Path or ''):gsub('^/','')),f))
+   end)
+   assert(#actualCodes==#expectedCodes,'Imported Lua component count differs at '..where..recovery)
    local function normal(s) return s and s:gsub('\r\n','\n'):gsub('\n+$','') end
-   for i,f in ipairs(source.meta.components) do
-    local ef=exported.components[i]
-    local actual=read(join(check,ef)) or read(join(join(check,(exported.Path or ''):gsub('^/','')),ef))
-    local expected=read(join(source.folder,f))
-    assert(actual and expected and normal(actual)==normal(expected),
-     'Imported Lua did not match '..f..' at '..where..recovery)
+   for i,expected in ipairs(expectedCodes) do
+    assert(normal(actualCodes[i])==normal(expected),
+     'Imported Lua did not match component '..i..' at '..where..recovery)
    end
    report('Installed '..item.plugin.name..' '..item.version..' at Plugin '..slot.slot)
   end

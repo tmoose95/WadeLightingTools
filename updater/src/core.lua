@@ -118,11 +118,14 @@ function M.xml(text)
  if not attrs then return nil,'No UserPlugin metadata' end
  local meta={};for k,v in attrs:gmatch('([%w_]+)%s*=%s*"([^"]*)"') do meta[k]=unescape(v) end
  if not meta.Name or not M.version(meta.Version) then return nil,'Missing plugin name or version' end
- meta.components={}
- for block in text:gmatch('<ComponentLua%s+([^>]+)>') do
+ meta.components={};meta.componentCount=0
+ for block in text:gmatch('<ComponentLua([%s/][^>]*)>') do
+  meta.componentCount=meta.componentCount+1
   local f=block:match('FileName%s*=%s*"([^"]+)"')
   if f then f=unescape(f);if not M.path(f) then return nil,'Unsafe Lua filename' end;meta.components[#meta.components+1]=f end
  end
+ -- A nameless embedded component is valid too.
+ for _ in text:gmatch('<ComponentLua>') do meta.componentCount=meta.componentCount+1 end
  return meta
 end
 function M.matches(meta,plugin)
@@ -140,5 +143,95 @@ function M.base64(s)
   out[#out+1]=alphabet:sub((n>>18)+1,(n>>18)+1)..alphabet:sub(((n>>12)&63)+1,((n>>12)&63)+1)
    ..(b and alphabet:sub(((n>>6)&63)+1,((n>>6)&63)+1) or '=')..(c and alphabet:sub((n&63)+1,(n&63)+1) or '=')
  end;return table.concat(out)
+end
+function M.unbase64(s)
+ if type(s)~='string' then return nil end
+ s=s:gsub('%s','')
+ if #s%4~=0 or s:find('[^A-Za-z0-9+/=]') or s:find('=.+[^=]') or s:find('===',1,true) then return nil end
+ local alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+ local map={};for i=1,64 do map[alphabet:byte(i)]=i-1 end
+ local out={}
+ for i=1,#s,4 do
+  local a,b,c,d=s:byte(i,i+3)
+  if not map[a] or not map[b] or (c==61 and d~=61) or ((c==61 or d==61) and i+3~=#s) then return nil end
+  local x=(map[a]<<18)|(map[b]<<12)|((map[c] or 0)<<6)|(map[d] or 0)
+  out[#out+1]=string.char((x>>16)&255)
+  if c~=61 then out[#out+1]=string.char((x>>8)&255) end
+  if d~=61 then out[#out+1]=string.char(x&255) end
+ end
+ return table.concat(out)
+end
+local function attributes(s)
+ local a={};for k,v in s:gmatch('([%w_]+)%s*=%s*"([^"]*)"') do a[k]=unescape(v) end;return a
+end
+local function components(text)
+ assert(M.xml(text),'Invalid plugin XML')
+ local count=0;for _ in text:gmatch('<UserPlugin[%s>]') do count=count+1 end
+ assert(count==1,'Nested/multiple plugin definitions are not supported for automatic updates')
+ local result,at={},1
+ while true do
+  local start=text:find('<ComponentLua[%s/>]',at);if not start then break end
+  local last=assert(text:find('>',start,true),'Unclosed Lua component')
+  local header=text:sub(start+13,last-1);local finish,body=last,''
+  if not header:match('/%s*$') then
+   local closeStart,closeEnd=text:find('</ComponentLua%s*>',last+1)
+   assert(closeStart,'Unclosed Lua component');finish=closeEnd;body=text:sub(last+1,closeStart-1)
+  end
+  local a=attributes(header);local code
+  if body:find('<FileContent',1,true) then
+   local info,blocks=body:match('<FileContent%s+([^>]+)>(.-)</FileContent%s*>')
+   assert(info and blocks,'Invalid embedded Lua content')
+   local total=tonumber(attributes(info).Size);local parts={}
+   for block in blocks:gmatch('<Block%s+([^>]+)>') do
+    parts[#parts+1]=assert(M.unbase64(attributes(block).Base64),'Invalid embedded Lua base64')
+   end
+   assert(total and total==#parts and total>0,'Embedded Lua block count differs')
+   code=table.concat(parts)
+  end
+  result[#result+1]={first=start,last=finish,attrs=a,code=code}
+  at=finish+1
+ end
+ assert(#result>0,'Plugin has no Lua components');return result
+end
+function M.luaContents(text,readFile)
+ local data={}
+ for i,c in ipairs(components(text)) do
+  local code=c.code
+  if not code then
+   assert(M.path(c.attrs.FileName),'Missing/unsafe Lua component filename')
+   code=assert(readFile(c.attrs.FileName),'Missing Lua component: '..c.attrs.FileName)
+  end
+  assert(#code>0 and not code:find('\0',1,true),'Invalid Lua component content')
+  data[i]=code
+ end
+ return data
+end
+function M.embeddedPlugin(text,readFile,pulse)
+ local nodes=components(text);local codes=M.luaContents(text,readFile);local out={};local at=1
+ local function escape(s) return s:gsub('&','&amp;'):gsub('"','&quot;'):gsub('<','&lt;'):gsub('>','&gt;') end
+ for i,c in ipairs(nodes) do
+  -- Explicit empty filename clears an old library/resource association when
+  -- Import merges into an existing component. Installed=No keeps code in show.
+  local a=c.attrs;a.FileName='';a.Installed='No';a.Index=tostring(i)
+  a.Source=nil;a.IsResource=nil;a.InStream=nil;a.FilePath=nil
+  local keys={};for k in pairs(a) do keys[#keys+1]=k end;table.sort(keys)
+  local attrs={};for _,k in ipairs(keys) do attrs[#attrs+1]=k..'="'..escape(a[k])..'"' end
+  local code=codes[i]
+  local syntax,why=load(code:gsub('^\239\187\191',''),'@WLT component '..i,'t',{})
+  assert(syntax,'Lua component does not compile: '..tostring(why))
+  out[#out+1]=text:sub(at,c.first-1)
+  out[#out+1]='<ComponentLua '..table.concat(attrs,' ')..'><FileContent Size="'..math.ceil(#code/1024)..'">'
+  for j=1,#code,1024 do
+   out[#out+1]='<Block Base64="'..M.base64(code:sub(j,j+1023))..'"/>'
+   if pulse and j%65536==1 then pulse() end
+  end
+  out[#out+1]='</FileContent></ComponentLua>';at=c.last+1
+ end
+ out[#out+1]=text:sub(at)
+ local xml=table.concat(out):gsub('(<UserPlugin%s+)([^>]+)',function(prefix,attrs)
+  return prefix..attrs:gsub('%s*Index%s*=%s*"[^"]*"','')
+ end,1)
+ assert(M.xml(xml),'Embedded import XML exceeds supported size')
+ return xml,codes
 end
 return M

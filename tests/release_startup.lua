@@ -2,7 +2,7 @@
 -- No plugin import, show modification, filesystem write, or network request.
 assert(_VERSION=='Lua 5.5','This regression requires Lua 5.5')
 local scenario=arg[2] or 'normal'
-local version=arg[3] or '1.1.6'
+local version=arg[3] or '1.1.7'
 local appearance='PluginUpdator_'..version:gsub('%.','_')
 for _,name in ipairs({'core','transport','runtime','display','main'})do
  assert(loadfile('updater/src/'..name..'.lua'))

@@ -230,7 +230,7 @@ test('Both import modes are blocked for every catalog plugin before any writes',
  setup({fullCatalog=true});trace={};local before=#progress
  for _,entry in ipairs(R.catalog)do for _,action in ipairs({1,3})do
   local ok,why=pcall(R.plan,{[entry.id]=action})
-  assert(not ok and tostring(why):find('temporarily disabled',1,true),entry.id..': '..tostring(why))
+  assert(not ok and tostring(why):find(R.importNotice,1,true),entry.id..': '..tostring(why))
  end end
  assert(#imports==0 and #calls==0 and #progress==before)
  for _,event in ipairs(trace)do assert(not event:match('^http:'))end
@@ -238,7 +238,7 @@ end)
 test('A stale or forged mixed plan is rejected before its first download',function()
  setup();local plan=R.plan({ServerCommand=2});plan.items[#plan.items+1]={mode=3,plugin=p};trace={}
  local ok,why=pcall(R.run,plan)
- assert(not ok and tostring(why):find('temporarily disabled',1,true))
+ assert(not ok and tostring(why):find(R.importNotice,1,true))
  assert(#imports==0 and #calls==0 and #progress==0 and #trace==0)
 end)
 test('Default mode is download-only and preserves existing showfile plugin code',function()
@@ -251,10 +251,11 @@ test('Updater can be downloaded without queuing self replacement or a timer',fun
  local result,handoff=R.run(R.plan({WadePluginUpdater=2}));assert(result:match('^OK'),result)
  assert(not handoff and #imports==0 and #calls==0 and #timers==0)
  assert(pool.Plugins[12].props.Version=='1.1.4')
- assert(read(drives[2].props.Path..'/plugins/WLT Plugin Updator/WLT Plugin Updator_v1.1.6.xml'))
+ local updater;for _,entry in ipairs(R.catalog)do if entry.id=='WadePluginUpdater'then updater=entry end end
+ assert(read(drives[2].props.Path..'/plugins/WLT Plugin Updator/WLT Plugin Updator_v'..updater.version..'.xml'))
 end)
 test('No USB downloads only to the internal current library',function()
- setup({noUSB=true,oldVersions=true});assert(#R.drives==1 and R.drives[1].number==1)
+ setup({noUSB=true,oldVersions=true});localPackage(drives[1],'2.3.14');R.scan(false);assert(#R.visible(2)>0,'Drives tab must include internal packages without USB');assert(#R.drives==1 and R.drives[1].number==1)
  assert(R.run(R.plan({ServerCommand=2})):match('^OK'))
  assert(read(drives[1].props.Path..'/plugins/ServerCommand/Server_Command_v2.3.15.xml'))
  assert(#imports==0 and #calls==0)

@@ -18,8 +18,9 @@ local function control(name)
 end
 local displays={};for i=1,3 do local d=object(nil,'Display');d._index=i;d.W=1920;d.H=1080;d.ScreenOverlay=object(d,'Overlay');displays[i]=d end
 local pools={{Name='Main',_index=1},{Name='Tour',_index=2}}
-local root={ColorTheme={ColorGroups={Button={BackgroundNormal='grey',BackgroundPlease='green',TextPlease='yellow',TextDisabled='lightgrey'},Global={Transparent='clear',Text='white',AlertText='red'}}},ShowData={Appearances={PluginUpdator_1_1_5={}},DataPools=pools}}
+local root={ColorTheme={ColorGroups={Button={BackgroundNormal='grey',BackgroundPlease='green',TextPlease='yellow',TextDisabled='lightgrey'},Global={Transparent='clear',Text='white',AlertText='red'}}},ShowData={Appearances={PluginUpdator_1_1_6={}},DataPools=pools}}
 local R={catalog={{id='ServerCommand',name='Server Command',version='2.3.15',minimum='2.5.1.0'},{id='HippoRemote',name='Hippo Remote',version='1.3.0',minimum='2.5.1.0'}},drives={{path='/usb',label='USB',external=true}},selectedDrives={['/usb']=true},pool=pools[1],online=true,issues={},mode=1,localChoice={},installed={},showInstalled={}}
+R.importNotice='Showfile import is temporarily disabled after a reported console restart.'
 local server=R.catalog[1];local hippo=R.catalog[2]
 R.installed.ServerCommand={{version='2.3.14',poolName='Main'}};R.showInstalled=R.installed
 local source={version='2.3.14',drive=R.drives[1]};R.localFiles={ServerCommand={source},HippoRemote={source}}
@@ -54,7 +55,7 @@ local launch=assert(load(read('updater/src/display.lua')..'\n'..read('updater/sr
 local hits={};for name,fn in pairs(sig)do sig[name]=function(...)hits[name]=true;return fn(...)end end
 local count=0;local function test(name,fn)fn();count=count+1;print('PASS '..name)end
 local function click(name)local c=control(name);assert(sig[c.Clicked],c.Clicked or name);sig[c.Clicked](c)end
-test('Startup scan dialog precedes main UI on caller display',function()launch();assert(events[1]=='scan');assert(plugin.Appearance==root.ShowData.Appearances.PluginUpdator_1_1_5);assert(control('WadePluginUpdater'):Parent()==displays[2].ScreenOverlay);assert(R.allPools)end)
+test('Startup scan dialog precedes main UI on caller display',function()launch();assert(events[1]=='scan');assert(plugin.Appearance==root.ShowData.Appearances.PluginUpdator_1_1_6);assert(control('WadePluginUpdater'):Parent()==displays[2].ScreenOverlay);assert(R.allPools)end)
 test('Every button callback exists; table uses native ScrollBox and ScrollBarV',function()
  for _,c in ipairs(nodes)do if valid(c)and c.Clicked then assert(sig[c.Clicked],c.Clicked)end end
  assert(control('PluginScroll')._class=='ScrollBox');assert(control('PluginScrollbar').ScrollTarget==control('PluginScroll'))
@@ -63,7 +64,7 @@ test('Version cells are red for non-current and green for latest',function()
  assert(control('Installed_ServerCommand').BackColor=='red');assert(control('USB_ServerCommand').BackColor=='red');assert(control('Online_ServerCommand').BackColor=='green')
 end)
 test('Three tabs filter rows and keep staged actions',function()
- answers={{success=true,result=1}};click('Action_ServerCommand');assert(control('Update').Text=='Update (1)')
+ answers={{success=true,result=2}};click('Action_ServerCommand');assert(control('Update').Text=='Update (1)')
  local scroll=control('PluginScroll');answers={{success=true,result=2}};click('Action_ServerCommand');assert(control('PluginScroll')==scroll,'Action changes must not reset scroll position')
  click('Tab3');assert(control('Action_HippoRemote'));assert(not pcall(control,'Action_ServerCommand'));assert(control('Update').Text=='Update (1)')
  click('Tab2');assert(control('Action_ServerCommand'));click('Tab1')
@@ -123,9 +124,9 @@ test('Settings opens Drives; Apply and Cancel work',function()
  answers={{success=true,result=0,states={USB=true}}};click('Drives');assert(not R.selectedDrives['/usb'])
  answers={{success=true,result=1,states={USB=true}}};click('Drives');assert(R.selectedDrives['/usb'])
 end)
-test('DataPool selector supports one pool and All DataPools',function()
- answers={{success=true,result=2}};click('Pool');assert(R.pool==pools[2]and not R.allPools)
- answers={{success=true,result=-1}};click('Pool');assert(R.allPools)
+test('Destination control explains the import pause instead of offering pool writes',function()
+ click('Pool');assert(dialogs[#dialogs].title=='Showfile import paused')
+ assert(control('Pool').Text=='Showfile import paused - Info')
 end)
 test('Drive version chooser selects actual package',function()
  answers={{success=true,result=1}};click('USB_ServerCommand');assert(R.localChoice.ServerCommand==source)
@@ -138,7 +139,7 @@ test('Info, Help, Connection Details and Rescan work',function()
 end)
 test('No queued action and review cancellation do not update',function()
  answers={{success=true,result=2}};click('Bulk');click('Update');assert(ran==0 and dialogs[#dialogs].message:find('Choose an action',1,true))
- answers={{success=true,result=1}};click('Action_ServerCommand');answers={{success=true,result=0}};click('Update');assert(planned==1 and ran==0)
+ answers={{success=true,result=2}};click('Action_ServerCommand');answers={{success=true,result=0}};click('Update');assert(planned==1 and ran==0)
 end)
 test('Confirmed review refreshes showfile without scanning drives',function()
  local start=#events
@@ -155,7 +156,7 @@ test('Update opens a real progress panel and native System Monitor view',functio
   notify('Verifying',750,1000,true);assert(control('UpdateProgressFill').W==quarter*3)
   notify('Complete',1000,1000,true);assert(control('UpdatePercent').Text=='100%');return 'Done'
  end
- answers={{success=true,result=1}};click('Action_ServerCommand')
+ answers={{success=true,result=2}};click('Action_ServerCommand')
  local stops=progressStops;answers={{success=true,result=1},{success=true,result=1}};click('Update')
  assert(progressStops==stops+1 and not pcall(control,'WLTUpdating'));R.run=old
 end)
@@ -168,47 +169,44 @@ test('Unsupported native monitor uses exactly three labelled updater log lines',
   for i=1,3 do assert(control('UpdateActivity'..i).Text=='Message '..(i+2))end
   assert(not pcall(control,'UpdateActivity4'));return 'Done'
  end
- answers={{success=true,result=1}};click('Action_ServerCommand')
+ answers={{success=true,result=2}};click('Action_ServerCommand')
  answers={{success=true,result=1},{success=true,result=1}};click('Update')
  R.run=old;env.ClassExists=function(name)return name=='QRCode' or name=='SystemMonitorWindow'end
 end)
 test('Unexpected update error closes progress without forcing completion',function()
  local old=R.run;R.run=function()notify('Importing',650,1000,true);error('Native import failure')end
- answers={{success=true,result=1}};click('Action_ServerCommand')
+ answers={{success=true,result=2}};click('Action_ServerCommand')
  local stops=progressStops;answers={{success=true,result=1},{success=true,result=1}};click('Update')
  assert(progressValues[#progressValues]==650 and progressStops==stops+1)
  assert(not pcall(control,'WLTUpdating') and control('WadePluginUpdater'));R.run=old
 end)
 test('Progress popup setup failure clears busy state and partial window before import',function()
- answers={{success=true,result=1}};click('Action_ServerCommand')
+ answers={{success=true,result=2}};click('Action_ServerCommand')
  local before=ran;appendFailure=true
  answers={{success=true,result=1}};click('Update');appendFailure=false
  assert(ran==before and dialogs[#dialogs].message:find('Simulated popup setup failure',1,true))
  assert(not pcall(control,'WLTUpdating'));click('Tab3');assert(control('Tab3').State==1);click('Tab1')
 end)
-test('Updater offers drive plus showfile, download-only and offline import actions',function()
- local oldVisible=R.visible
- local own={id='WadePluginUpdater',name='WLT Plugin Updator',version='1.1.5',minimum='2.5.1.0'}
- R.catalog[#R.catalog+1]=own;R.visible=function()return {own}end
- R.localFiles.WadePluginUpdater={source};R.installed.WadePluginUpdater={{version='1.1.4'}}
- click('Tab1');answers={{success=true,result=1}};click('Action_WadePluginUpdater')
- local cmds=dialogs[#dialogs].commands;local available={};for _,c in ipairs(cmds)do available[c.value]=c.name end
- assert(available[1]=='Update Drives + Showfile' and available[2] and available[3])
- assert(control('Action_WadePluginUpdater').Text:find('Update Drives + Showfile',1,true))
- answers={{success=true,result=1}};click('Bulk');assert(control('Action_WadePluginUpdater').Text:find('Update Drives + Showfile',1,true))
- local oldRun=R.run;local queued={}
- env.CmdIndirect=function(command)
-  assert(not pcall(control,'WadePluginUpdater') and not pcall(control,'WLTUpdating'),'Old plugin UI must close before self replacement')
-  queued[#queued+1]=command
+test('All action menus exclude imports, including the updater itself',function()
+ local oldVisible,oldCatalog=R.visible,R.catalog
+ R.catalog=dofile('updater/src/core.lua').catalog(read('catalog.tsv'));R.visible=function()return R.catalog end
+ click('Tab1')
+ for _,p in ipairs(R.catalog)do
+  answers={{success=true,result=0}};click('Action_'..p.id)
+  for _,cmd in ipairs(dialogs[#dialogs].commands)do assert(cmd.value==0 or cmd.value==2)end
+  assert(dialogs[#dialogs].message:find('temporarily disabled',1,true))
+  answers={{success=true,result=1}};click('Action_'..p.id);assert(control('Action_'..p.id).Text:find('Do Nothing',1,true))
+  answers={{success=true,result=3}};click('Action_'..p.id);assert(control('Action_'..p.id).Text:find('Do Nothing',1,true))
  end
- R.run=function()return 'READY',{command='LuaFile "/temporary/FinishUpdate.lua"'}end
- answers={{success=true,result=0}};click('Update');assert(#queued==0)
- answers={{success=true,result=1}};click('Update');assert(#queued==1 and queued[1]=='LuaFile "/temporary/FinishUpdate.lua"')
- R.run=oldRun;R.visible=oldVisible;table.remove(R.catalog);R.localFiles.WadePluginUpdater=nil;R.installed.WadePluginUpdater=nil
- launch();click('Tab1')
+ R.catalog,R.visible=oldCatalog,oldVisible;click('Tab1')
+end)
+test('Bulk action uses download-only even when showfile versions are behind',function()
+ answers={{success=true,result=1}};click('Bulk')
+ assert(control('Action_ServerCommand').Text:find('Download to Drives',1,true))
 end)
 test('Move screen preserves tab and actions; inactive screens disabled',function()
- click('Tab2');answers={{success=true,result=3}};click('Action_HippoRemote');click('Move');assert(control('Display4').Enabled=='No');click('CancelMove')
+ answers={{success=true,result=2}};click('Bulk')
+ click('Tab2');answers={{success=true,result=2}};click('Action_HippoRemote');click('Move');assert(control('Display4').Enabled=='No');click('CancelMove')
  click('Move');click('Display3');assert(control('WadePluginUpdater'):Parent()==displays[3].ScreenOverlay);assert(control('Tab2').State==1 and control('Update').Text=='Update (1)')
 end)
 test('Busy guards and Cancel stop further work then close',function()

@@ -1,80 +1,106 @@
-WLT PLUGIN UPDATOR v1.0.3
+WLT PLUGIN UPDATOR v1.1.0
 Aaron Wade - Crossfade Design
 Target: grandMA3 2.5.1.0 and later 2.5 releases
 
 INSTALL
-1. Extract this archive.
-2. Copy WLT Plugin Updator to grandMA3/gma3_library/datapools/plugins/ on USB.
-3. Edit an empty plugin pool slot, select your USB drive, and import
-   WLT Plugin Updator_v1.0.3.xml from the WLT Plugin Updator folder.
-4. Run the plugin. It scans connected drives BEFORE opening the main window.
+1. Close the previous updater and extract this ZIP.
+2. Copy WLT Plugin Updator into grandMA3/gma3_library/datapools/plugins/ on USB.
+3. Edit the existing updater pool slot (or an empty slot), choose your USB,
+   and import WLT Plugin Updator_v1.1.0.xml from that folder.
+4. Run it. A progress window scans connected drives and the showfile before
+   opening the main table. Cancel & Exit stops the scan.
 
-WORKFLOW
-- Installed: versions in the selected destination DataPool.
-- On Drive: newest complete XML/Lua package on your selected drives.
-- Online: latest published catalog version, when the catalog request succeeds.
-- Select Updates selects newer versions of plugins already in that DataPool.
-  Individual rows can also be selected to install new plugins.
-- Drives selects one or more download destinations and local package sources.
-- DataPool selects the destination. Existing matching plugins keep their slots;
-  new plugins are placed only in empty slots. All matching copies in that
-  DataPool are shown in the review and updated.
-- Download & Install: verify downloads, write selected drives, then import.
-- Download Only: update files on selected drives without importing into the show.
-- Install Only: import the newest complete package on selected drives.
-- Rescan repeats drive and internet checks.
-- The monitor icon opens the display preference layout used in Server Command.
+TABS AND VERSION COLOURS
+- Plugins in your Showfile: recognized WLT plugins across all DataPools.
+- Plugins on your USB Drives: recognized, complete packages on removable drives.
+- More Plugins: catalog plugins not yet in the showfile.
+- Showfile, USB / Drive and Online version cells compare to the live catalog.
+  Green = matches latest. Red = different (older OR newer). Grey = unknown,
+  no copy, or an unavailable online catalog. A newer installed version is never
+  downgraded. Info shows the versions and DataPool names.
+- A showfile cell containing several copies is red if any copy differs.
+- USB / Drive displays the selected source package; an internal source is marked
+  Internal. Tap it to choose another complete version on the selected drives.
+- Scroll the table with the station's native scroll gestures or scrollbar.
+  Selecting row actions preserves the scroll position.
+
+ACTIONS
+Tap each row's Action selector to queue one action:
+- Do Nothing: no changes for that plugin.
+- Import Online: download the latest files to the selected drives, then import.
+- Download to Drives: download files and ZIP without changing the showfile.
+- Import from Drive: import the chosen complete local package without internet.
+The Action column header selects available updates or clears all queued actions.
+Update opens a review listing every action, drive, DataPool and plugin slot.
+Nothing is downloaded or installed just by selecting a row action.
+
+DESTINATIONS
+Drives selects download destinations and permitted local package sources.
+Update Destination defaults to All DataPools; select an individual pool to
+restrict imports. Existing matching plugins retain their slots. If a plugin is
+missing, an empty slot is allocated in each chosen DataPool. The review lists
+all targets. Multiple matching copies are preserved and updated in place.
+
+Settings contains Drives, Rescan and Connection Details.
+The monitor icon opens the display preference layout used in Server Command.
+Tab and queued actions are retained when moving screens.
+
+INTERNET / CONNECTION DETAILS
+Catalog: https://raw.githubusercontent.com/tmoose95/WadeLightingTools/main/catalog.tsv
+Website: https://tmoose95.github.io/WadeLightingTools/
+
+Version 1.1.0 removes the requirement for a separate timeout utility when using
+OpenSSL on a console. The downloader uses a bounded background process while
+Lua yields. A current Mozilla CA bundle is embedded in the Lua component, so
+certificate checks also work on stations with an incomplete system CA store.
+The USB does not need to stay connected just to provide the certificates.
+
+Linux/macOS: curl, or OpenSSL with peer/hostname validation, or GNU Wget.
+Windows onPC: Windows PowerShell/.NET HTTPS with the system trust store.
+All connections retain certificate validation. No insecure HTTP fallback.
+The updater never changes the console's network configuration.
+
+An unavailable catalog is now labelled Online catalog unavailable. It is not a
+claim that the whole station has no internet. Connection Details displays the
+client and actual error (certificate, DNS, connection timeout, HTTP status, or
+missing client). MA World Server and other updaters contact different services.
+If TLS reports an expired or not-yet-valid certificate, verify station time.
+Local packages remain usable while the catalog is unavailable.
 
 DRIVE SCANNING
-Uses the drives recognized by this MA3 station, including internal and removable
-storage. It reads the MA plugin library folders, not every file on the disk.
-It recognizes the catalog's plugin subfolders and XML exports at the plugin
-library root. Unpacked packages must have every external Lua component beside
-the XML. A ZIP copied by itself must be extracted first. The updater downloads
-both the original ZIP and its validated install files; no console unzip tool
-is needed. Source XMLs are rechecked before import. Removed drives are rejected.
-
-INTERNET
-The fixed catalog is:
-https://raw.githubusercontent.com/tmoose95/WadeLightingTools/main/catalog.tsv
-Website:
-https://tmoose95.github.io/WadeLightingTools/
-HTTPS requires curl, or openssl plus timeout, on a Linux/macOS station.
-Windows onPC uses Windows PowerShell/.NET HTTPS. Certificate checking stays on.
-A missing client, bad certificate, unreachable host or timeout leaves Install
-Only available. The updater never changes console network configuration.
-Downloads run in bounded background jobs while the Lua UI yields.
+Reads the MA plugin library on drives recognized by this station, including
+internal and removable storage. It reads recognized plugin subfolders and XML
+exports at the library root, not every file on disk. Extract ZIPs first; each
+package must contain all external Lua components beside its XML.
+Downloaded packages include both the original ZIP and verified install files;
+no console unzip tool is required. Removed drives are rejected before import.
 
 PACKAGE PROTECTION
-SHA-256 and byte counts are verified against the HTTPS catalog before any
-release is installed. Drive files are staged and read back, then the folder is
-promoted; an existing folder is moved into WadeLightingToolsData/backups.
-Original ZIP downloads are kept in WadeLightingToolsData/downloads.
-Existing show plugins are exported and checked before replacement. A missing
-backup component stops installation. Newer or unknown installed versions are
-not silently overwritten. The batch stops at the first failure and lists the
-result; completed updates are not rolled back automatically.
+SHA-256 hashes and byte counts are checked against the HTTPS catalog.
+Files are staged and read back before folder replacement. Existing drive folders
+are preserved in WadeLightingToolsData/backups. Download ZIPs are retained in
+WadeLightingToolsData/downloads. Existing show plugins are exported and checked
+before replacement. A missing backup component stops installation. Newer or
+unknown versions and locked plugins are not overwritten. The batch stops at
+its first failure; completed updates are not rolled back automatically.
 
-The updater does not update its own running plugin in place. Use
-Download Only for WLT Plugin Updator, close it, then import its new XML manually.
-Utility Plugins is assigned at runtime; no incompatible XML Tags field is used.
-The embedded pool image is 300 x 300 RGB PNG with 1024-byte image blocks.
+The running updater cannot replace itself. Choose Download to Drives, close
+it, and manually import the new XML into its existing pool slot.
+The catalog ID remains WadePluginUpdater for compatibility with prior names.
+The green update-circle image remains 300 x 300 RGB PNG with 1024-byte blocks.
+Utility Plugins is assigned at runtime rather than using an incompatible XML
+Tags field. The two WLT version-cell colours are added to the UI colour theme;
+existing theme colours are not modified.
 
 VERIFICATION LIMIT
-Automated source/package and mock-environment tests accompany the repository.
-Actual 2.5.1 console import, drive filesystem permissions, HTTPS utilities,
-scroll gestures and display movement must still be checked on the console.
-This is an independent implementation of a batch updater workflow. It does not
-use MATools code, licenses, account services or branding.
+Lua 5.5 package/startup tests, mocked MA runtime/UI tests, actual local TLS
+certificate/hostname rejection tests and a read-only live GitHub download test
+accompany this revision. These do not replace native console testing.
+The supplied grandMA3.app bundle is macOS 2.4.2.2. This Linux build environment
+cannot execute it, so this release has NOT been run inside grandMA3 onPC.
+Native 2.5.1 imports, touch gestures, screen movement and the desk's HTTPS client
+still need confirmation on the station.
 
-REVISION 1.0.3
-Fixes the startup GetPath parameter error reported on MA3 2.5.1.
-The plugin library path type is read from the running Plugin object with
-GetPathType(plugin, 1); the documented folder-name overload is the fallback.
-No missing PathType.UserPlugins enum is passed to GetPath or GetPathOverrideFor.
-Internal and USB drive paths use the same resolved path type. A drive whose
-library path cannot be resolved is reported and skipped.
-Keeps the WLT Plugin Updator names, green update-circle image and Lua 5.5 fixes.
-Close the previous updater and import WLT Plugin Updator_v1.0.3.xml into its
-existing plugin slot. The catalog ID is retained and previous updater names
-and folders are recognized.
+Independent WLT implementation, using the supplied screenshots as a workflow
+reference. No MATools code, account services, advertising or branding included.
+Certificate bundle attribution is in CA-LICENSE.txt.

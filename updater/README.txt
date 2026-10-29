@@ -1,4 +1,4 @@
-WLT PLUGIN UPDATOR v1.1.1
+WLT PLUGIN UPDATOR v1.1.3
 Aaron Wade - Crossfade Design
 Target: grandMA3 2.5.1.0 and later 2.5 releases
 
@@ -6,7 +6,7 @@ INSTALL
 1. Close the previous updater and extract this ZIP.
 2. Copy WLT Plugin Updator into grandMA3/gma3_library/datapools/plugins/ on USB.
 3. Edit the existing updater pool slot (or an empty slot), choose your USB,
-   and import WLT Plugin Updator_v1.1.1.xml from that folder.
+   and import WLT Plugin Updator_v1.1.3.xml from that folder.
 4. Run it. A progress window scans connected drives and the showfile before
    opening the main table. Cancel & Exit stops the scan.
 
@@ -67,15 +67,28 @@ missing client). MA World Server and other updaters contact different services.
 If TLS reports an expired or not-yet-valid certificate, verify station time.
 Local packages remain usable while the catalog is unavailable.
 
-WHAT CHANGED IN 1.1.1
-- Uses MA's object Import(directory, filename) on the exact target plugin,
-  bypassing the Library keyword/cache lookup that failed in the console log.
-- Checks the import result, plugin version and exported Lua contents. Existing
-  show-plugin backups are retained. A reported OK command alone is not success.
-- Reads each plugin directory/XML once per scan, with no startup SHA-256 pass.
-- Reuses scanned metadata after fetching the online catalog. Only newly listed
-  plugin folders need an additional read. Updates refresh affected packages and
-  showfile metadata without triggering a second full drive scan.
+WHAT CHANGED IN 1.1.3
+- More Plugins has a QR Code button for each plugin not installed in any DataPool.
+  Tap it for a large native QR code linking directly to that plugin's page at
+  tmoose95.github.io/WadeLightingTools. The code is generated on the station;
+  the QR window itself does not require an internet connection.
+- The QR window shows the plugin name and exact URL, opens on the current
+  display, and closes with Close or Escape. No image pool slots are created.
+- Includes the import corrections below.
+
+IMPORT CORRECTIONS FROM 1.1.2
+- Corrects the common show-pool import step used by both Import Online and
+  Import from Drive. Download to Drives continues to save the original package.
+- Imports a temporary self-contained XML with Lua embedded as FileContent.
+  Clears component FileName/Installed associations in this temporary copy to
+  avoid MA looking for that code under shared/resource/lib_plugins.
+- Retains the package metadata, image dependencies and component order. The
+  original downloaded/USB files are not rewritten for this conversion.
+- Compares numeric versions so 2.3.15 and 2.3.15.0 match. Exported Lua is checked
+  byte-for-byte (apart from line endings/trailing newlines), including embedded
+  exports. Failed metadata checks report expected and actual values plus backup.
+- Keeps the 1.1.1 scan improvements: current internal/connected USB plugin
+  libraries only, one pass per folder/XML, and no full rescan after updating.
 
 DRIVE SCANNING
 Only the current internal plugin library (Drive 1) and connected removable USB
@@ -85,8 +98,8 @@ Reads catalog plugin folders and XML exports directly at the plugin-library root
 It never walks showfiles, media, backups, downloads or unrelated directories.
 The current show's plugin metadata is checked in memory; no saved shows are read.
 
-ZIP-only copies must be extracted first. Each local package needs its Lua files
-beside the XML. Local-source checksums are taken when that package is selected
+ZIP-only copies must be extracted first. Each local package needs its external Lua files
+beside the XML, or valid embedded Lua content in the XML. Local-source checksums are taken when that package is selected
 for review and checked again before import. Online file and ZIP checksums remain
 mandatory. Settings > Rescan deliberately starts a fresh plugin-folder scan.
 Removed drives are rejected before import.

@@ -1,5 +1,5 @@
 -- UI entry point. Core, Transport, Runtime, button and display helpers are bundled above.
-local VERSION='1.0.2'
+local VERSION='1.0.3'
 local ui={selected={},busy=false}
 local R
 local build
@@ -154,7 +154,7 @@ build=function(display)
 end
 local function metadata()
  safe(function()
-  local p=myHandle:Parent();local appearance=Root().ShowData.Appearances.PluginUpdator_1_0_2
+  local p=myHandle:Parent();local appearance=Root().ShowData.Appearances.PluginUpdator_1_0_3
   if appearance then p.Appearance=appearance end
   local tag
   for _,t in ipairs(ObjectList('Tag Thru') or {})do if R.prop(t,'Name')=='Utility Plugins' then tag=t;break end end
@@ -169,7 +169,7 @@ return function()
  if old then remove(old.chooser);remove(old.base)end
  _G.__WadeLightingToolsWindow=ui;ui.busy=true
  local ok,why=pcall(function()
-  R=Runtime(Core,Transport,BOOTSTRAP,notify)
+  R=Runtime(Core,Transport,BOOTSTRAP,notify,myHandle:Parent())
   ui.display=GetFocusDisplay() or GetDisplayByIndex(1)
   metadata()
   scan(true) -- Main window is created only after the connected-drive scan.

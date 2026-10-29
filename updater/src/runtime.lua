@@ -1,4 +1,4 @@
-return function(Core,Transport,bootstrap,notify)
+return function(Core,Transport,bootstrap,notify,plugin)
  local R={catalog=Core.catalog(bootstrap),drives={},localFiles={},installed={},selectedDrives={},cancel=false,mode=1,online=false,issues={}}
  local function safe(fn,other) local ok,v=pcall(fn);if ok then return v end;return other end
  local function prop(h,n)
@@ -34,8 +34,19 @@ return function(Core,Transport,bootstrap,notify)
  end
  local serial=0
  local function unique() serial=serial+1;return os.date('%Y%m%d_%H%M%S')..'_'..serial end
- local root=GetPath(Enums.PathType.UserPlugins)
- assert(type(root)=='string' and #root>0,'MA plugin folder is unavailable')
+ -- Ask the running Plugin object for its user-library path type. Some MA3
+ -- versions do not define PathType.UserPlugins; never pass that nil to the API.
+ local pathType=valid(plugin) and safe(function()return GetPathType(plugin,1)end,nil) or nil
+ if type(pathType)~='string' or pathType=='' then pathType='plugins' end
+ local function pluginRoot(base)
+  local value=safe(function()
+   if base then return GetPathOverrideFor(pathType,base,false) end
+   return GetPath(pathType,false)
+  end,nil)
+  if type(value)=='string' and value~='' then return value end
+ end
+ local root=pluginRoot()
+ assert(root,'MA plugin library path is unavailable. No files were changed.')
  local work=join(root,'WadeLightingToolsData/work')
  local transport=Transport(Core,{work=work,windows=tostring(HostOS()):lower():find('windows',1,true)~=nil,
   mkdir=mkdir,write=write,read=read,exists=exists,now=now,pause=pause,cancelled=function()return R.cancel end})
@@ -95,11 +106,13 @@ return function(Core,Transport,bootstrap,notify)
   for _,h in pairs(children(collection)) do
    local n,path=index(h),prop(h,'Path');local kind=prop(h,'DriveType'):lower()
    if n and n>0 and n%1==0 and path~='' and valid(h) then
-    local r=n==1 and root or safe(function()return GetPathOverrideFor(Enums.PathType.UserPlugins,path,false)end,nil)
+    local r=n==1 and root or pluginRoot(path)
     if type(r)=='string' and r~='' then
      local d={handle=h,number=n,path=path,root=r,label='Drive '..n..' - '..prop(h,'Name'),external=kind=='removeable' or kind=='removable'}
      R.drives[#R.drives+1]=d
      if old[path] then R.selectedDrives[path]=true end
+    else
+     issue('Drive '..n..' - '..prop(h,'Name')..': plugin library path is unavailable; drive skipped')
     end
    end
   end

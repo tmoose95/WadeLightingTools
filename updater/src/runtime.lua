@@ -1,5 +1,5 @@
-return function(Core,Transport,bootstrap,notify,plugin)
- local R={catalog=Core.catalog(bootstrap),drives={},localFiles={},installed={},selectedDrives={},cancel=false,mode=1,online=false,issues={}}
+return function(Core,Transport,bootstrap,notify,plugin,trustBundle)
+ local R={catalog=Core.catalog(bootstrap),drives={},localFiles={},installed={},selectedDrives={},cancel=false,mode=1,online=false,issues={},allPools=false,localChoice={},showInstalled={}}
  local function safe(fn,other) local ok,v=pcall(fn);if ok then return v end;return other end
  local function prop(h,n)
   if not h then return '' end
@@ -49,7 +49,7 @@ return function(Core,Transport,bootstrap,notify,plugin)
  assert(root,'MA plugin library path is unavailable. No files were changed.')
  local work=join(root,'WadeLightingToolsData/work')
  local transport=Transport(Core,{work=work,windows=tostring(HostOS()):lower():find('windows',1,true)~=nil,
-  mkdir=mkdir,write=write,read=read,exists=exists,now=now,pause=pause,cancelled=function()return R.cancel end})
+  mkdir=mkdir,write=write,read=read,exists=exists,now=now,pause=pause,cancelled=function()return R.cancel end},trustBundle)
  R.prop,R.index,R.valid,R.children,R.pause=prop,index,valid,children,pause
  local function report(text) notify(text);Printf('WLT Plugin Updator | %s',text) end
  local function issue(text) R.issues[#R.issues+1]=text;report(text) end
@@ -58,15 +58,25 @@ return function(Core,Transport,bootstrap,notify,plugin)
  end
  local function assertDrive(d) assert(driveValid(d),'Drive removed or changed: '..d.label) end
  local function pluginMeta(p) return {Name=prop(p,'Name'),Version=prop(p,'Version'),Author=prop(p,'Author'),Path=prop(p,'Path')} end
+ function R.pools()
+  local a={};for _,p in pairs(children(Root().ShowData.DataPools)) do if valid(p) and index(p) then a[#a+1]=p end end
+  table.sort(a,function(x,y)return index(x)<index(y)end);return a
+ end
+ function R.targetPools() return R.allPools and R.pools() or {R.pool} end
  function R.refreshInstalled()
-  R.installed={}
+  R.installed={};R.showInstalled={}
   assert(valid(R.pool),'Destination DataPool is no longer available')
-  for _,h in pairs(children(R.pool.Plugins)) do
-   local m=pluginMeta(h)
-   for _,p in ipairs(R.catalog) do
-    if Core.matches(m,p) then
-     local a=R.installed[p.id] or {};R.installed[p.id]=a
-     a[#a+1]={handle=h,slot=index(h),version=m.Version,name=m.Name}
+  for _,pool in ipairs(R.pools()) do
+   for _,h in pairs(children(pool.Plugins)) do
+    local m=pluginMeta(h)
+    for _,p in ipairs(R.catalog) do
+     if Core.matches(m,p) then
+      local x={handle=h,slot=index(h),version=m.Version,name=m.Name,pool=pool,poolNumber=index(pool),poolName=prop(pool,'Name')}
+      local a=R.showInstalled[p.id] or {};R.showInstalled[p.id]=a;a[#a+1]=x
+      if R.allPools or pool==R.pool then
+       a=R.installed[p.id] or {};R.installed[p.id]=a;a[#a+1]=x
+      end
+     end
     end
    end
   end
@@ -100,7 +110,7 @@ return function(Core,Transport,bootstrap,notify,plugin)
   for _,a in pairs(R.localFiles) do table.sort(a,function(x,y)return (Core.compare(x.version,y.version) or 0)>0 end) end
  end
  function R.scan(connect)
-  R.cancel=false;R.issues={};R.drives={}
+  R.cancel=false;R.issues={};R.drives={};R.localChoice={}
   local old=R.selectedDrives;R.selectedDrives={}
   local collection=safe(function()return Root().Temp.DriveCollect end,nil)
   for _,h in pairs(children(collection)) do
@@ -130,8 +140,12 @@ return function(Core,Transport,bootstrap,notify,plugin)
     return Core.catalog(transport.get('catalog.tsv',262144))
    end)
    if ok then
-    R.catalog=new;R.online=true;scanFolders()
-   else R.online=false;issue('Internet catalog unavailable. Drive installs remain available. '..tostring(new)) end
+    R.catalog=new;R.online=true;R.connectionError=nil;R.client=transport.client;scanFolders()
+   else
+    if R.cancel then error('Cancelled') end
+    R.online=false;R.connectionError=tostring(new);R.client=transport.client
+    issue('Online catalog unavailable. Local packages remain available. '..R.connectionError)
+   end
   end
   R.refreshInstalled();report(#R.drives..' drive(s) scanned | '..(R.online and 'Online catalog loaded' or 'Local catalog'))
  end
@@ -140,15 +154,47 @@ return function(Core,Transport,bootstrap,notify,plugin)
    if (not selectedOnly or R.selectedDrives[e.drive.path]) and driveValid(e.drive) then return e end
   end
  end
- function R.installedText(p)
-  local a=R.installed[p.id] or {};if #a==0 then return 'Not installed' end
-  local versions={};for _,x in ipairs(a) do versions[x.version~='' and x.version or '?']=true end
-  local t={};for v in pairs(versions) do t[#t+1]=v end;table.sort(t)
-  return table.concat(t,', ')..(#a>1 and (' ('..#a..')') or '')
+ function R.localSource(p)
+  local choice=R.localChoice[p.id]
+  if choice and R.selectedDrives[choice.drive.path] and driveValid(choice.drive) then
+   for _,e in ipairs(R.localFiles[p.id] or {}) do if e==choice then return choice end end
+  end
+  return R.localBest(p,true)
+ end
+ function R.installedText(p,all)
+  local a=(all and R.showInstalled or R.installed)[p.id] or {};if #a==0 then return 'Not installed' end
+  local t={};for _,x in ipairs(a) do t[#t+1]=(x.version~='' and x.version or '?')..' ('..x.poolName..')' end
+  return table.concat(t,'\n')
+ end
+ -- Only a successfully fetched catalog can determine whether a version is current.
+ function R.versionStateFor(p,version)
+  if not R.online then return 'unknown' end
+  local c=Core.compare(version,p.version)
+  if c==nil then return 'unknown' end
+  return c==0 and 'current' or (c<0 and 'outdated' or 'newer')
+ end
+ function R.installedState(p)
+  local a=R.showInstalled[p.id] or {};if #a==0 or not R.online then return 'unknown' end
+  local state='current'
+  for _,x in ipairs(a) do
+   local v=R.versionStateFor(p,x.version)
+   if v=='outdated' or v=='newer' then return v end
+   if v=='unknown' then state='unknown' end
+  end
+  return state
+ end
+ function R.visible(tab)
+  local a={}
+  for _,p in ipairs(R.catalog) do
+   local installed=#(R.showInstalled[p.id] or {})>0
+   local usb=false;for _,e in ipairs(R.localFiles[p.id] or {}) do if e.drive.external then usb=true;break end end
+   if (tab==1 and installed) or (tab==2 and usb) or (tab==3 and not installed) then a[#a+1]=p end
+  end
+  return a
  end
  function R.status(p)
-  local v=R.mode==3 and (R.localBest(p,true) or {}).version or (R.online and p.version or nil)
-  if not v then return R.mode==3 and 'No selected-drive copy' or 'Internet unavailable' end
+  local v=R.mode==3 and (R.localSource(p) or {}).version or (R.online and p.version or nil)
+  if not v then return R.mode==3 and 'No selected-drive copy' or 'Online catalog unavailable' end
   local a=R.installed[p.id] or {};if #a==0 then return 'New install' end
   local newer,older,unknown=false,false,false
   for _,x in ipairs(a) do local c=Core.compare(v,x.version);newer=newer or c==1;older=older or c==-1;unknown=unknown or c==nil end
@@ -166,13 +212,19 @@ return function(Core,Transport,bootstrap,notify,plugin)
   assert(#plan.drives>0,'Select at least one drive')
   for _,d in ipairs(plan.drives) do assertDrive(d) end
   R.refreshInstalled()
-  local occupied={};for _,h in pairs(children(R.pool.Plugins)) do local n=index(h);if n then occupied[n]=true end end
-  for _,p in ipairs(R.catalog) do if selected[p.id] then
-   local source=R.mode==3 and R.localBest(p,true) or nil
-   assert(R.mode==3 or R.online,'Online catalog is unavailable. Choose Install Only for a drive copy.')
-   assert(R.mode~=3 or source,'No complete local package on a selected drive: '..p.name)
+  local occupied={}
+  for _,pool in ipairs(R.targetPools()) do
+   local n=index(pool);assert(n and n>0,'Invalid DataPool number')
+   occupied[n]={};for _,h in pairs(children(pool.Plugins)) do local slot=index(h);if slot then occupied[n][slot]=true end end
+  end
+  for _,p in ipairs(R.catalog) do if selected[p.id] and selected[p.id]~=0 then
+   local mode=type(selected[p.id])=='number' and selected[p.id] or R.mode
+   assert(mode==1 or mode==2 or mode==3,'Unknown row action')
+   local source=mode==3 and R.localSource(p) or nil
+   assert(mode==3 or R.online,'Online catalog is unavailable. Choose Import from Drive for a local copy.')
+   assert(mode~=3 or source,'No complete local package on a selected drive: '..p.name)
    local v=source and source.version or p.version
-   if R.mode~=3 then
+   if mode~=3 then
     for _,e in ipairs(R.localFiles[p.id] or {}) do
      if R.selectedDrives[e.drive.path] then
       assert((Core.compare(v,e.version) or -1)>=0,'A selected drive has a newer version of '..p.name..'; it was not replaced')
@@ -180,7 +232,7 @@ return function(Core,Transport,bootstrap,notify,plugin)
     end
    end
    local installed=R.installed[p.id] or {}
-   if R.mode~=2 then
+   if mode~=2 then
     assert(p.id~='WadePluginUpdater','Download the updater, then import it manually after closing this window')
     local runtime=tostring(Version()):match('(%d+%.%d+%.%d+%.?%d*)')
     assert(runtime and (Core.compare(runtime,p.minimum) or -1)>=0,'This release requires MA3 '..p.minimum)
@@ -189,15 +241,26 @@ return function(Core,Transport,bootstrap,notify,plugin)
      assert(prop(x.handle,'Lock'):lower()~='yes','Plugin is locked: '..p.name)
     end
    end
-   local slots={};for _,x in ipairs(installed) do assert(x.slot,'Invalid plugin slot');slots[#slots+1]=x end
-   if #slots==0 and R.mode~=2 then
-    local n=1;while occupied[n] do n=n+1 end;assert(n<=9999,'No free plugin slot');occupied[n]=true;slots={{slot=n}}
+   local slots={}
+   if mode~=2 then
+    for _,pool in ipairs(R.targetPools()) do
+     assert(prop(pool,'Lock'):lower()~='yes','DataPool is locked: '..prop(pool,'Name'))
+     local n=index(pool);local found=false
+     for _,x in ipairs(installed) do if x.pool==pool then
+      assert(x.slot,'Invalid plugin slot');slots[#slots+1]=x;found=true
+     end end
+     if not found then
+      local slot=1;while occupied[n][slot] do slot=slot+1 end;assert(slot<=9999,'No free plugin slot')
+      occupied[n][slot]=true;slots[#slots+1]={slot=slot,pool=pool,poolNumber=n,poolName=prop(pool,'Name')}
+     end
+    end
    end
-   plan.items[#plan.items+1]={plugin=p,source=source,version=v,slots=slots}
-   local target={};for _,x in ipairs(slots) do target[#target+1]=tostring(x.slot) end
-   plan.lines[#plan.lines+1]=p.name..' '..v..(R.mode~=2 and (' -> DataPool '..poolNumber..' / Plugin '..table.concat(target,', ')) or ' -> selected drive(s)')
+   plan.items[#plan.items+1]={plugin=p,source=source,version=v,slots=slots,mode=mode}
+   local target={};for _,x in ipairs(slots) do target[#target+1]='DataPool '..x.poolNumber..' / Plugin '..x.slot end
+   local action=mode==1 and 'Import Online' or (mode==2 and 'Download to Drives' or 'Import from Drive')
+   plan.lines[#plan.lines+1]=p.name..' '..v..' - '..action..(mode~=2 and (' -> '..table.concat(target,', ')) or '')
   end end
-  assert(#plan.items>0,'Select one or more plugins');return plan
+  assert(#plan.items>0,'Choose an action for one or more plugins');return plan
  end
  local function validateLocal(e,p)
   assertDrive(e.drive)
@@ -276,7 +339,8 @@ return function(Core,Transport,bootstrap,notify,plugin)
   validateLocal(source,item.plugin)
   assert(valid(plan.pool) and index(plan.pool)==plan.poolNumber,'Destination DataPool changed')
   for _,slot in ipairs(item.slots) do
-   local current=plan.pool.Plugins[slot.slot]
+   assert(valid(slot.pool) and index(slot.pool)==slot.poolNumber,'Destination DataPool changed')
+   local current=slot.pool.Plugins[slot.slot]
    if slot.handle then assert(current==slot.handle,'Plugin slot changed after review')
    else assert(not valid(current),'New plugin slot is now occupied') end
    if not slot.backup then backupSlot(item,slot) end
@@ -285,11 +349,11 @@ return function(Core,Transport,bootstrap,notify,plugin)
    pulse();assertDrive(source.drive)
    local relative=source.folder:sub(#source.drive.root+1):gsub('^[/\\]','')
    assert(source.folder:sub(1,#source.drive.root)==source.drive.root,'Import path is outside the plugin library')
-   checked('Import Plugin Library '..q(source.xml)..' At DataPool '..plan.poolNumber..' Plugin '..slot.slot
+   checked('Import Plugin Library '..q(source.xml)..' At DataPool '..slot.poolNumber..' Plugin '..slot.slot
     ..' If Drive '..source.drive.number..' /Path '..q(relative=='' and '.' or relative)..' /NoConfirmation')
    local untilTime=now()+3;local found
    repeat
-    pause(.05);found=plan.pool.Plugins[slot.slot]
+    pause(.05);found=slot.pool.Plugins[slot.slot]
     if valid(found) and prop(found,'Version')==item.version then break end
    until now()>=untilTime
    assert(valid(found) and Core.matches(pluginMeta(found),item.plugin) and prop(found,'Version')==item.version,
@@ -304,13 +368,13 @@ return function(Core,Transport,bootstrap,notify,plugin)
    local ok,why=pcall(function()
     local source=item.source
     -- Preserve the original show code before replacing any library source folder.
-    if plan.mode~=2 then for _,slot in ipairs(item.slots) do backupSlot(item,slot) end end
-    if plan.mode~=3 then
+    if item.mode~=2 then for _,slot in ipairs(item.slots) do backupSlot(item,slot) end end
+    if item.mode~=3 then
      local m,data,zip=release(item.plugin);local sources={}
      for _,d in ipairs(plan.drives) do pulse();sources[#sources+1]=savePackage(d,item.plugin,m,data,zip) end
      source=sources[1]
     end
-    if plan.mode~=2 then install(item,source,plan) end
+    if item.mode~=2 then install(item,source,plan) end
    end)
    results[#results+1]=(ok and 'OK: ' or 'FAILED: ')..item.plugin.name..(ok and '' or (' - '..tostring(why)))
    if not ok then issue(results[#results]);break end -- Stop batch after first partial/failure.

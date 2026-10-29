@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GMA3 DataVersion="2.4.0.2">
+  <UserPlugin Index="1" Name="API Info" Path="/APIInfo" Version="1.0.3" Author="Aaron Wade - Crossfade Design" Note="Read-only grandMA3 diagnostic that selects the first external drive and exports current API and session/network information to grandMA3/gma3_library/datapools/plugins/APIInfo.">
+    <ComponentLua Index="1" FileName="API_Info.lua" Name="Main" />
+  </UserPlugin>
+</GMA3>

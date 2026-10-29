@@ -1,0 +1,5 @@
+WLT-RELEASE	1	TourLocation	1.0.10	TourLocation	TourLocation_v1.0.10.xml
+FILE	README_TourLocation.txt	packages/TourLocation/1.0.10/TourLocation/README_TourLocation.txt	5987	f5485e5e1bc164b0a209f5cd5e1ac69fd162d6ab566e9b80f488076d1af4a2b2
+FILE	TourLocation.lua	packages/TourLocation/1.0.10/TourLocation/TourLocation.lua	60676	3794050de53713040c9e8717f573d3993b6455d621ba935f17e1fdb80d14db60
+FILE	TourLocation_v1.0.10.xml	packages/TourLocation/1.0.10/TourLocation/TourLocation_v1.0.10.xml	165551	142d2de90ef2226002f55b62d598f8ac0665fde3fb5b3f07d12ae2ebe4cf0f01
+ZIP	TourLocation_v1.0.10.zip	releases/TourLocation_v1.0.10.zip	146279	71f45e873be2e5c0bdfd61b66400418d740508782195bfb506e95c5a16da5091

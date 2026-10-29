@@ -1,0 +1,13 @@
+Mozilla CA root certificate bundle
+
+Source: https://curl.se/ca/cacert.pem
+Mozilla data: 2026-10-20
+SHA-256: 796f1389bfea13c0ed78f663b765baaff54a508e5483786bd6ece73c5e3e3cbe
+
+This Source Code Form is subject to the terms of the Mozilla Public License,
+v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain
+one at https://mozilla.org/MPL/2.0/.
+
+Original source: https://raw.githubusercontent.com/mozilla-firefox/firefox/refs/heads/release/security/nss/lib/ckfw/builtins/certdata.txt
+The unmodified PEM source is provided in updater/ca/cacert.pem and embedded
+in the updater Lua component so verification works after USB removal.

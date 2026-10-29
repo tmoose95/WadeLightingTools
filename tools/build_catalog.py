@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 OWNER, REPO = 'tmoose95', 'WadeLightingTools'
 RAW = f'https://raw.githubusercontent.com/{OWNER}/{REPO}/main/'
 REGISTRY = ROOT / 'registry.json'
-VERSION = '1.0.3'
+VERSION = '1.1.0'
 UPDATER_NAME = 'WLT Plugin Updator'
 UPDATER_FOLDER = UPDATER_NAME
 
@@ -102,7 +102,7 @@ def catalog(rows):
 
 def updater(bootstrap):
     source = ROOT / 'updater/src'
-    preamble = '''-- WLT Plugin Updator v1.0.3 | Aaron Wade - Crossfade Design | grandMA3 2.5.1
+    preamble = '''-- WLT Plugin Updator v1.1.0 | Aaron Wade - Crossfade Design | grandMA3 2.5.1
 local _,_,signalTable,myHandle=...
 local function safe(fn,fallback) local ok,v=pcall(fn);if ok then return v end;return fallback end
 local function button(parent,column,row,name,text,clicked,color)
@@ -111,7 +111,7 @@ local function button(parent,column,row,name,text,clicked,color)
  b.PluginComponent=myHandle;b.Clicked=clicked;b.HasHover='Yes';if color then b.BackColor=color end;return b
 end
 '''
-    content = preamble
+    content = preamble + "\nlocal TRUST_BUNDLE=[====[\n" + (ROOT/'updater/ca/cacert.pem').read_text() + "]====]\n"
     for module,filename in [('Core','core.lua'),('Transport','transport.lua'),('Runtime','runtime.lua')]:
         content += f'\nlocal {module}=(function()\n' + (source/filename).read_text() + '\nend)()\n'
     content += '\nlocal BOOTSTRAP=[====[\n' + bootstrap + ']====]\n'
@@ -122,7 +122,7 @@ end
     root=ET.Element('GMA3',DataVersion='2.5.1.0')
     user=ET.SubElement(root,'UserPlugin',Index='1',Name=UPDATER_NAME,Path='/'+UPDATER_FOLDER,Version=VERSION,
         Author='Aaron Wade - Crossfade Design',Appearance=f'PluginUpdator_{VERSION.replace(chr(46), chr(95))}',
-        Note='Scan connected drives, compare installed/local/online versions, and download or install WadeLightingTools releases. Utility Plugins.')
+        Note='Three-tab updater with per-plugin actions, red/green version cells, all-DataPool destinations and console HTTPS with bundled Mozilla certificates. Utility Plugins.')
     dep=ET.SubElement(ET.SubElement(user,'DependencyExport',Size='1'),'Dependency',Address=f'ShowData.Appearances.PluginUpdator_{VERSION.replace(chr(46), chr(95))}')
     appearance=ET.SubElement(dep,'Appearance',Name=f'PluginUpdator_{VERSION.replace(chr(46), chr(95))}',MediaFileName='CUSTOM/'+UPDATER_NAME+'.png',
         BackR='0',BackG='0',BackB='0',BackAlpha='255',Color='1.0000000000,1.0000000000,1.0000000000,1.0000000000')
@@ -135,9 +135,10 @@ end
     ET.indent(root);ET.ElementTree(root).write(folder/f'{UPDATER_NAME}_v{VERSION}.xml',encoding='UTF-8',xml_declaration=True)
     (folder/(UPDATER_NAME+'.png')).write_bytes(png)
     shutil.copyfile(ROOT/'updater/README.txt',folder/'README.txt')
+    shutil.copyfile(ROOT/'updater/ca/LICENSE',folder/'CA-LICENSE.txt')
     output=ROOT/'releases'/f'{UPDATER_NAME}_v{VERSION}.zip'
     with zipfile.ZipFile(output,'w',zipfile.ZIP_DEFLATED) as z:
-        for name in [UPDATER_NAME+'.lua', UPDATER_NAME+'.png', 'README.txt', f'{UPDATER_NAME}_v{VERSION}.xml']:
+        for name in [UPDATER_NAME+'.lua', UPDATER_NAME+'.png', 'README.txt', 'CA-LICENSE.txt', f'{UPDATER_NAME}_v{VERSION}.xml']:
             z.write(folder/name, f'{UPDATER_FOLDER}/{name}')
     return output
 
@@ -160,7 +161,7 @@ def website(rows):
         body=f'''<main><a class="back" href="../index.html#plugins">← All plugins</a><section class="plugin-hero"><div><p class="eyebrow">WADE LIGHTING TOOLS / GRANDMA3</p><h1>{html.escape(p['name'])}</h1><p class="lede">{html.escape(p['summary'])}</p><div class="meta"><span>Version {p['version']}</span><span>Catalog target: MA3 {p['minimum']}</span></div><a class="primary" href="../downloads/{p['archive']}" download>Download ZIP <span>↓</span></a></div><div class="icon-stage">{('<img src="../assets/'+image_url+'" alt="'+html.escape(p['name'])+' icon">') if p.get('image') else '<span>'+html.escape(p['name'])+'</span>'}</div></section>
 <section class="detail-grid"><article><p class="eyebrow">01 / INSTALL</p><h2>From download to pool.</h2><ol><li>Extract <strong>{p['archive']}</strong>.</li><li>Copy <strong>{p['folder']}</strong> into your drive’s <code>grandMA3/gma3_library/datapools/plugins/</code> folder.</li><li>Edit a plugin pool slot, choose Import, then select <strong>{p['xml']}</strong>.</li><li>Close the editor and run the plugin.</li></ol><p class="note">The archive includes the release’s original metadata and assets. Follow the included README for plugin-specific instructions.</p></article><article><p class="eyebrow">02 / RELEASE</p><h2>About this revision.</h2><p>{html.escape(p['note'])}</p><dl><dt>Package</dt><dd>{p['archive']}</dd><dt>Size</dt><dd>{p['bytes']:,} bytes</dd><dt>SHA-256</dt><dd class="hash">{p['zip_sha256']}</dd></dl><p class="note">These are the latest available project packages. The updater does not certify every plugin on every console configuration.</p></article></section></main>'''
         if p['id']=='WadePluginUpdater':
-            body=body.replace('</main>', '''<section class="workflow"><p class="eyebrow">THE UPDATE WORKFLOW</p><h2>Scan. Compare. Update.</h2><div class="steps"><article><b>01</b><h3>Scan connected drives</h3><p>Internal and removable drives are scanned before the main window opens.</p></article><article><b>02</b><h3>Choose your updates</h3><p>Compare installed, local and online versions. Choose drives and a destination DataPool.</p></article><article><b>03</b><h3>Choose how to install</h3><p>Download & Install, Download Only, or Install Only using complete packages already on a selected drive.</p></article></div><p class="note">Internet updates require this GitHub repository to be published and a supported HTTPS client on the station. The updater has automated test coverage; native console import, touch and transport behavior still require on-console testing.</p></section></main>''')
+            body=body.replace('</main>', '''<section class="workflow"><p class="eyebrow">THE UPDATE WORKFLOW</p><h2>Scan. Compare. Update.</h2><div class="steps"><article><b>01</b><h3>Scan connected drives</h3><p>Internal and removable drives are scanned before the main window opens.</p></article><article><b>02</b><h3>Choose your updates</h3><p>Showfile, USB Drives and More Plugins tabs. Green versions match the live catalog; red versions differ. Unknown versions stay grey.</p></article><article><b>03</b><h3>Choose how to install</h3><p>Choose Import Online, Download to Drives or Import from Drive for each plugin. Review the queued actions and target DataPools before applying.</p></article></div><p class="note">Console HTTPS supports OpenSSL without the separate timeout utility and includes a Mozilla certificate bundle. Connection Details reports the actual error if catalog access fails. The updater has automated test coverage; native console import, touch and transport behavior still require on-console testing.</p></section></main>''')
         directory=docs/p['id'];directory.mkdir(exist_ok=True);(directory/'index.html').write_text(page(p['name'],body,1))
     body=f'''<main><section class="hero"><div><p class="eyebrow"><span class="dot"></span> TOOLS FOR THE PROGRAMMER</p><h1>Less setup.<br><span>More show.</span></h1><p class="lede">A growing collection of grandMA3 plugins by Aaron Wade. Find the current revision, download it, and get back to programming.</p><div class="actions"><a class="primary" href="#plugins">Explore plugins <span>↓</span></a><a class="secondary" href="WadePluginUpdater/">Get the updater ↗</a></div></div><div class="console-art" aria-hidden="true"><div class="art-label">WADE / LIGHTING TOOLS <span>01 — {len(rows):02d}</span></div><div class="art-screen"><span>WLT</span><i></i><i></i><i></i><i></i></div><div class="art-faders"><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="art-foot">BUILT AROUND YOUR WORKFLOW</div></div></section>
 <section id="plugins"><div class="section-head"><div><p class="eyebrow">THE COLLECTION</p><h2>Your tools. One place.</h2></div><p>{len(rows)} plugins · Versioned downloads</p></div><div class="catalog">{''.join(cards)}</div></section>

@@ -1,5 +1,7 @@
 # WadeLightingTools
 
+**Current updater: 1.1.6 containment release.** Automated showfile imports are paused after a reported console restart affecting every attempted plugin. Drive downloads remain available. The native crash cause is unconfirmed; earlier mock import results are not evidence of native stability.
+
 grandMA3 plugins by Aaron Wade, with a static GitHub Pages catalog and an independent batch updater targeting MA3 2.5.1.
 
 ## Project layout
@@ -36,9 +38,11 @@ The updater's internet catalog is served from raw.githubusercontent.com, so onli
 
 ## Updater behavior
 
-Only the current internal plugin library and connected removable USB plugin libraries are scanned before the main window opens. With no USB attached, only internal storage is scanned and selected. Older software-version and remote drives are excluded. The UI has Showfile, USB Drives and More Plugins tabs with per-plugin Import Online, Download to Drives and Import from Drive actions. Version cells are green for a live-catalog match, red for differing versions and grey for unknown/unavailable versions. A scan dialog supports Cancel & Exit. Choose All DataPools or one destination, then review every target before applying. Selected drive handles/paths and destination pool slots are rechecked before use. Downloads use certificate-validated HTTPS and per-file SHA-256/size verification. Existing drive folders and show plugins are preserved before replacement. A failed batch stops and reports the failure; completed updates are not silently rolled back.
+The updater scans current internal and connected USB plugin libraries and compares showfile, drive and online versions. With no USB attached, only the internal library is scanned. Red/green version cells, QR pages, screen movement, download progress and HTTPS/checksum verification remain available.
 
-The updater recognizes unpacked XML/Lua packages in their expected plugin folder or at the plugin-library root. ZIP-only copies must be extracted before local installation. The updater downloads the ZIP and the individual install files itself, avoiding an unzip dependency on the console. The updater can update its own drive and showfile copies. Its self replacement runs last, through a prepared local LuaFile after the old window closes. Reopen it after the result message.
+In 1.1.6, only **Download to Drives** and **Do Nothing** are selectable. Both showfile import actions are rejected before a batch can write files or change pool objects. The packaged Lua contains no native `:Import` call and no self-replacement LuaFile continuation. A visible notice explains why the actions are paused. This contains the reported restart path; it does not fix or identify the native crash.
+
+Close v1.1.5 before installing the containment revision through MA3's normal plugin editor when programming can be interrupted. Do not use the affected updater import action or repeat it to obtain diagnostics. Existing logs can be collected with `CopyCrashLog` and `DumpLog`.
 
 ## Testing scope
 
@@ -89,3 +93,7 @@ Every plugin, including the updater, offers **Update Drives + Showfile**, **Down
 Self replacement is deferred until the other plugins finish. The old UI closes and a locally generated LuaFile continuation checks the prepared XML checksum and target slots, imports, and verifies exported Lua before reporting success. No extra helper plugin slot is created. Reopen the updater after its completion message.
 
 Install 1.1.5 manually once when upgrading from 1.1.4, whose progress popup fails before the update starts. Automated regression tests cover these paths; native MA3/onPC 2.5.1 execution is not claimed.
+
+## Plugin Updator 1.1.6
+
+Containment after the user reported that importing any plugin from a drive through v1.1.5 restarted the console. Both automated import modes and self replacement are blocked. Downloads, local discovery, version comparison and existing drive backups remain available. Root-cause investigation and the intended combined drive/showfile workflow remain pending native evidence. The following earlier revision notes describe historical behavior, not current support.

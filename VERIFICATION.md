@@ -64,3 +64,15 @@ Use a copy of the show. Launch with two drives attached and confirm the drive sc
 - All 11 release archives, manifests and 12 website pages validate. The green 300 x 300 RGB icon is unchanged.
 - Inspected the supplied grandMA3.app Info.plist: macOS 2.4.2.2. It cannot execute in the Linux build environment. No native grandMA3/onPC 2.5.1 execution is claimed. Console HTTPS, touch gestures, display changes and native imports still need station verification.
 - No other plugin release is changed or added by this revision.
+
+## WLT Plugin Updator 1.1.1
+
+- The supplied console log shows successful catalog/file downloads followed by Library import warnings and failed slot verification. This revision changes that import route; it does not disable verification or label the warning as an internet failure.
+- Uses MA's documented object Import(directory, filename) against the exact target plugin handle. Creates only a reviewed empty slot for new installs. Requires true return status, matching identity/version, and matching exported Lua components. Existing plugin backups remain available after failures. Native dependency/image import behavior remains an on-console verification item.
+- Restricts DriveCollect to current internal Drive 1 and connected Removeable/Removable USBs. OldVersion and remote entries are excluded. With no USB, internal is the only scanned/selected destination. Duplicate library paths are deduplicated.
+- Lists each root/catalog plugin folder once; parses each XML once; reuses metadata after the online catalog loads, adding only previously unseen folders. Discovery performs no SHA-256 pass. A selected local source is fingerprinted at review and checked before import.
+- Does not recurse into shows, media, old software, backups, downloads or unrelated directories. The running show's plugin metadata is read in memory. Batch completion refreshes affected package entries and showfile metadata without rescanning drives.
+- Regression with three physical drives and one catalog plugin: six folder listings, two XML reads/parses and zero discovery hashes despite the online catalog refresh. Additional tests cover internal-only startup, OldVersion/RemoteDrive exclusion, duplicate paths, catalog growth, post-update refresh, new-slot creation, stale-code rejection and the actual MA Search 0.3.9 payload into mocked slot 19.
+- 98 automated checks passed with Lua 5.5: 4 actual bundled-release startup cases, 13 core, 40 mocked runtime, 16 mocked UI, 21 unchanged Hippo Remote and 4 actual local TLS cases. All 11 archive/manifests and 12 website pages validated. The 300 x 300 green logo is unchanged.
+- These tests do not run the MA engine. Native console/onPC execution and measured console scan time are not claimed. The provided macOS 2.4.2.2 app cannot run on this Linux host.
+- Official API reference: https://help.malighting.com/grandMA3/2.5/HTML/lua_object_import.html . Drive enumeration reference: https://help.malighting.com/grandMA3/2.5/HTML/lua_objectfree_getpathoverridefor.html .

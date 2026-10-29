@@ -1,0 +1,7 @@
+WLT-RELEASE	1	WadePluginUpdater	1.1.2	WLT Plugin Updator	WLT Plugin Updator_v1.1.2.xml
+FILE	CA-LICENSE.txt	packages/WadePluginUpdater/1.1.2/WLT Plugin Updator/CA-LICENSE.txt	653	bd2c4d9544c7d2559afece186cb2048bfa43b0373d447677b2875c67fa59c18e
+FILE	README.txt	packages/WadePluginUpdater/1.1.2/WLT Plugin Updator/README.txt	7509	538de6f0bf0677d6aee8711cfc98024e5b906b5a86c8fec4eddadb2e21743b1c
+FILE	WLT Plugin Updator.lua	packages/WadePluginUpdater/1.1.2/WLT Plugin Updator/WLT Plugin Updator.lua	268888	50e04a8bf624158cedb3f990a2632e8f3ea1349256e76802f45432f95102658e
+FILE	WLT Plugin Updator.png	packages/WadePluginUpdater/1.1.2/WLT Plugin Updator/WLT Plugin Updator.png	69978	57cb8d0be90285143ac6c98492def53be55b731f96e78adfae826c4230f61d76
+FILE	WLT Plugin Updator_v1.1.2.xml	packages/WadePluginUpdater/1.1.2/WLT Plugin Updator/WLT Plugin Updator_v1.1.2.xml	97358	aaad1d5d0d7bd27fec29f5b054749accf01ac8615908b54147e62a6b21972f3b
+ZIP	WLT Plugin Updator_v1.1.2.zip	releases/WLT Plugin Updator_v1.1.2.zip	284266	7e6ffb0d978aa49be7aaa8c2afb452ef2b2bb3465628834552754a1605055cc9

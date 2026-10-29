@@ -1,4 +1,4 @@
-WLT PLUGIN UPDATOR v1.1.7
+WLT PLUGIN UPDATOR v1.1.8
 Aaron Wade - Crossfade Design
 Target: grandMA3 2.5.1.0 and later 2.5 releases
 
@@ -7,9 +7,13 @@ Showfile: Import from Drive, Import from Internet, Do Nothing.
   Both import choices remain visible, labelled paused. Selecting one explains
   the temporary restriction and does not change a pool object.
 Drives: Download from Internet, Do Nothing.
-  This updates selected drive packages from the verified online release.
-More Plugins: plugin QR pages, Download from Internet, and a paused Import
-  from Internet choice. Action queues are separate for each tab.
+  Available only for other plugins found in a complete package on a scanned
+  internal or connected USB drive. The source drive need not be selected as
+  a download destination. Eligibility is checked again before any download.
+  WLT Plugin Updator itself is free to download and open, with no drive-copy
+  requirement. A showfile-only copy does not qualify another plugin.
+More Plugins: plugin QR pages; Download from Internet appears only when a
+  drive copy qualifies (or for the free updater). Showfile imports remain paused. Action queues are separate for each tab.
 
 CONSOLE RESTART INVESTIGATION
 A restart was reported when starting an import through v1.1.5. The supplied
@@ -25,11 +29,17 @@ Lua has no native object Import call and no self-update LuaFile worker.
 Do not retry the affected updater import action on a production console.
 Native MA3 testing is still needed before imports can be enabled again.
 
+LICENSING
+This revision checks drive presence only. It does not prove purchase or
+register a drive. Purchase-key verification, registered-drive enforcement and
+checkout are separate unfinished work. Existing catalog URLs are preserved
+so the updater continues to work. The updater never requires a license key.
+
 INSTALL
 Close the old updater. Extract this ZIP and copy its WLT Plugin Updator folder
 into USB:/grandMA3/gma3_library/datapools/plugins/.
 When programming can be interrupted, use MA3's normal plugin editor to import
-WLT Plugin Updator_v1.1.7.xml. Do not use an older updater's automated import
+WLT Plugin Updator_v1.1.8.xml. Do not use an older updater's automated import
 actions to install this revision. The green 300 x 300 RGB icon is unchanged.
 
 AVAILABLE WORKFLOW

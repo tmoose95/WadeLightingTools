@@ -73,3 +73,9 @@ The revised tests model the resource lookup failure that the previous mock misse
 ## Plugin Updator 1.1.3
 
 Includes the 1.1.2 import corrections. In More Plugins, each uninstalled plugin has a QR Code button opening a large native MA QRCode widget with its own WadeLightingTools page URL. The popup works offline, opens on the current display, shows the exact URL, and uses no image pool slots. The 54-pixel rows and scrollable table remain compact.
+
+## Plugin Updator 1.1.4
+
+Updates display a progress bar and percentage driven by transfer bytes and completed backup, drive-write and import-verification steps. The compact native SystemMonitorWindow shows recent engine output. If that native class is unavailable, a clearly labelled fallback shows the last three updater messages sent to System Monitor. Progress reaches 100% only after all reviewed actions have passed verification.
+
+An existing exported Lua component that is zero bytes no longer prevents recovery indefinitely. The updater preserves the damaged export and an INCOMPLETE-BACKUP.txt notice, validates and compiles the replacement, and asks whether to repair the exact affected slots. Cancel leaves the show slots unchanged. A failed/missing backup or invalid replacement still stops the update.

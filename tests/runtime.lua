@@ -12,6 +12,11 @@ local function obj(properties,n)
  function o:CmdlineIndex()return self.n end;function o:Children()return self.list end
  function o:Export(path,name)
   if self.failBackup then return false end
+  if self.imported then
+   write(path..'/'..name,self.imported.xml)
+   for filename,data in pairs(self.imported.files) do write(path..'/'..filename,data) end
+   return true
+  end
   write(path..'/'..name,'<GMA3><UserPlugin Name="'..self.props.Name..'" Author="Aaron Wade" Version="'..self.props.Version..'" Path="/ServerCommand"><ComponentLua FileName="original.lua" /></UserPlugin></GMA3>')
   if not self.missingBackup then write(path..'/original.lua','return function() end')end;return true
  end
@@ -22,14 +27,20 @@ local function test(name,fn)fn();count=count+1;print('PASS '..name)end
 local catalogText=assert(read('catalog.tsv'))
 local all=C.catalog(catalogText);local p;for _,v in ipairs(all)do if v.id=='ServerCommand'then p=v end end
 local single='WLT-CATALOG\t1\n'..table.concat({'PLUGIN',p.id,p.name,p.version,p.minimum,p.folder,p.manifest,p.digest},'\t')..'\n'
-local root,pool,drives,R,trace,mode,calls
+local root,pool,drives,R,trace,mode,calls,imports
 local function setup(options)
  options=options or {};local path=home..'/case'..(count+1);mkdir(path)
- trace={};calls={};mode=options
+ trace={};calls={};imports={};mode=options
  local d1=obj({Name='Internal',Path=path..'/internal',DriveType='Harddisk'},1)
  local d2=obj({Name='USB A',Path=path..'/usb-a',DriveType='Removeable'},2)
  local d7=obj({Name='USB B',Path=path..'/usb-b',DriveType='Removable'},7)
- drives={d1,d2,d7};for _,d in ipairs(drives)do mkdir(d.props.Path..'/plugins')end
+ drives=options.noUSB and {d1} or {d1,d2,d7}
+ if options.oldVersions then
+  drives[#drives+1]=obj({Name='gma3_2.4.2',Path=path..'/gma3_2.4.2',DriveType='OldVersion'},8)
+  drives[#drives+1]=obj({Name='Remote Station',Path=path..'/remote',DriveType='RemoteDrive'},9)
+ end
+ if options.duplicate then drives[#drives+1]=obj({Name='Duplicate',Path=d2.props.Path,DriveType='Removeable'},10) end
+ for _,d in ipairs(drives)do mkdir(d.props.Path..'/plugins')end
  pool=obj({Name='Tour'},4);pool.Plugins=obj();pool.Plugins.list={}
  root={Temp={DriveCollect=obj()},ShowData={DataPools=obj()}};root.Temp.DriveCollect.list=drives;root.ShowData.DataPools.list={pool}
  function Root()return root end;function DataPool()return pool end
@@ -63,27 +74,34 @@ local function setup(options)
  local function add(slot,ver,target)
   target=target or pool
   local h=obj({Name='Server Command',Version=ver or '2.3.14',Author='Aaron Wade',Path='/ServerCommand',Lock='No'},slot)
+  function h:Import(folder,filename)
+   imports[#imports+1]={handle=self,pool=target,slot=slot,folder=folder,filename=filename}
+   assert(folder:sub(1,1)=='/' and not filename:find('/'),'Object Import requires directory and filename')
+   if options.importFail then return false end
+   local xml=assert(read(folder..'/'..filename));local m=assert(C.xml(xml))
+   if options.noReadback then return true end
+   self.props.Name=m.Name;self.props.Version=m.Version;self.props.Path=m.Path
+   self.imported={xml=xml,files={}}
+   for _,f in ipairs(m.components) do self.imported.files[f]=options.staleCode and 'old code' or assert(read(folder..'/'..f)) end
+   return true
+  end
   target.Plugins[slot]=h;target.Plugins.list[#target.Plugins.list+1]=h;return h
  end
  if options.installed then add(13,options.installed)end
  if options.two then add(26,options.installed)end
  function Cmd(command)
   calls[#calls+1]=command
-  if options.importFail then return 'Failed'end
-  local file,n,slot,dnum,relative=command:match('Import Plugin Library "([^"]+)" At DataPool (%d+) Plugin (%d+) If Drive (%d+) /Path "([^"]+)"')
+  local n,slot=command:match('^Store DataPool (%d+) Plugin (%d+) /NoConfirmation$')
   local target;for _,candidate in ipairs(root.ShowData.DataPools.list)do if candidate.n==tonumber(n)then target=candidate end end
-  assert(file and target,command);slot=tonumber(slot)
-  local drive;for _,d in ipairs(drives)do if d.n==tonumber(dnum)then drive=d end end
-  local xml=assert(read(drive.props.Path..'/plugins/'..relative..'/'..file));local m=assert(C.xml(xml))
-  if options.noReadback then return 'OK'end
-  local h=target.Plugins[slot] or add(slot,m.Version,target);h.props.Version=m.Version
+  assert(target,command);slot=tonumber(slot);assert(not target.Plugins[slot],'Store must only create an empty slot')
+  add(slot,'0.0.0',target)
   return 'Ok'
  end
  local function transport()
   return {get=function(remote)
    trace[#trace+1]='http:'..remote
    if options.offline then error('offline')end
-   if remote=='catalog.tsv'then return single end
+   if remote=='catalog.tsv'then return options.fullCatalog and catalogText or single end
    local result=assert(read(remote));if options.corrupt and remote:match('%.lua$')then result=result..'x'end
    return result
   end}
@@ -130,9 +148,10 @@ test('Download Only writes ZIP and files without importing show objects',functio
  local result=R.run(R.plan({ServerCommand=true}));assert(result:match('^OK'),result);assert(#calls==0)
  for _,d in ipairs({drives[2],drives[3]})do assert(read(d.props.Path..'/plugins/ServerCommand/Server_Command_v2.3.15.xml'));assert(read(d.props.Path..'/plugins/WadeLightingToolsData/downloads/ServerCommand_v2.3.15.zip'))end
 end)
-test('Download & Install retains existing slots and qualified DataPool',function()
+test('Object import uses absolute file paths and existing DataPool handles',function()
  setup({installed='2.3.14',two=true});local result=R.run(R.plan({ServerCommand=true}));assert(result:match('^OK'),result)
- assert(#calls==2 and calls[1]:find('At DataPool 4 Plugin 13',1,true)and calls[2]:find('At DataPool 4 Plugin 26',1,true))
+ assert(#calls==0 and #imports==2 and imports[1].pool==pool and imports[1].slot==13 and imports[2].slot==26)
+ assert(imports[1].folder==drives[2].props.Path..'/plugins/ServerCommand')
  assert(pool.Plugins[13].props.Version=='2.3.15' and pool.Plugins[26].props.Version=='2.3.15')
 end)
 test('New plugins choose only an empty slot',function()
@@ -196,8 +215,8 @@ test('All DataPools plans preserve each existing slot and import into each pool'
  add(7,'2.3.14',second);R.allPools=true;R.refreshInstalled()
  assert(#R.showInstalled.ServerCommand==2 and R.installedText(p,true):find('Main',1,true))
  local plan=R.plan({ServerCommand=1});assert(#plan.items[1].slots==2)
- local result=R.run(plan);assert(result:match('^OK'),result);assert(#calls==2)
- assert(calls[1]:find('DataPool 1 Plugin 7',1,true));assert(calls[2]:find('DataPool 4 Plugin 13',1,true))
+ local result=R.run(plan);assert(result:match('^OK'),result);assert(#imports==2 and #calls==0)
+ assert(imports[1].pool.n==1 and imports[1].slot==7);assert(imports[2].pool.n==4 and imports[2].slot==13)
 end)
 test('All DataPools allocates a free slot where the plugin is missing',function()
  setup({installed='2.3.14'});local second=obj({Name='Empty'},2);second.Plugins=obj();root.ShowData.DataPools.list[#root.ShowData.DataPools.list+1]=second
@@ -222,5 +241,68 @@ end)
 test('Three views distinguish showfile, USB packages and uninstalled catalog',function()
  setup({installed='2.3.14'});assert(#R.visible(1)==1 and#R.visible(2)==0 and#R.visible(3)==0)
  localPackage(drives[2],'2.3.15');R.scan(false);assert(#R.visible(2)==1)
+end)
+test('No USB uses only internal library and selects it for downloads/imports',function()
+ setup({noUSB=true,oldVersions=true})
+ assert(#R.drives==1 and R.drives[1].number==1 and R.selectedDrives[drives[1].props.Path])
+ for _,v in ipairs(trace) do assert(not v:find('gma3_2.4.2',1,true) and not v:find('/remote',1,true)) end
+ local result=R.run(R.plan({ServerCommand=1}));assert(result:match('^OK'),result)
+ assert(#imports==1 and imports[1].folder==drives[1].props.Path..'/plugins/ServerCommand')
+end)
+test('Old software/remote drives skipped while both connected USBs are scanned',function()
+ setup({oldVersions=true});assert(#R.drives==3 and R.scanStats.skipped==2)
+ for _,v in ipairs(trace) do assert(not v:find('gma3_2.4.2',1,true) and not v:find('/remote',1,true)) end
+end)
+test('Duplicate library paths are scanned once',function()
+ setup({duplicate=true});assert(#R.drives==3)
+ local seen={};for _,v in ipairs(trace) do if v:match('^scan:') then assert(not seen[v],v);seen[v]=true end end
+end)
+test('Online catalog reuses folder metadata and reads each XML only once',function()
+ setup();localPackage(drives[2],'2.3.15')
+ write(drives[2].props.Path..'/plugins/unrelated.xml','<Macro />')
+ local hashes,parses=0,0;local hash,xml=C.sha256,C.xml
+ C.sha256=function(...)hashes=hashes+1;return hash(...)end
+ C.xml=function(...)parses=parses+1;return xml(...)end
+ trace={};R.scan(true);C.sha256,C.xml=hash,xml
+ local seen={};for _,v in ipairs(trace) do if v:match('^scan:') then assert(not seen[v],v);seen[v]=true end end
+ assert(R.scanStats.folders==6 and R.scanStats.xml==2 and parses==2 and hashes==0)
+ assert(#R.localFiles.ServerCommand==1 and R.localFiles.ServerCommand[1].digest==nil)
+ local plan=R.plan({ServerCommand=3});assert(#plan.items[1].source.digest==64)
+end)
+test('New online catalog entries add only previously unseen plugin folders',function()
+ setup({fullCatalog=true});local seen={}
+ for _,v in ipairs(trace) do if v:match('^scan:') then assert(not seen[v],v);seen[v]=true end end
+ assert(#R.catalog==#all and R.scanStats.folders==3*(#all+1))
+end)
+test('Scan never descends into backups, shows, or unrelated directories',function()
+ setup();local base=drives[2].props.Path
+ write(base..'/plugins/WadeLightingToolsData/backups/old/plugin.xml','<GMA3/>')
+ write(base..'/shared/shows/a.xml','<Show/>');write(base..'/plugins/Other/other.xml','<Other/>')
+ trace={};R.scan(false)
+ for _,v in ipairs(trace) do assert(not v:find('/backups',1,true) and not v:find('/shared',1,true) and not v:find('/Other',1,true)) end
+ assert(R.scanStats.xml==0)
+end)
+test('Finished updates refresh only memory/showfile, with no second drive scan',function()
+ setup({installed='2.3.14'});local plan=R.plan({ServerCommand=1});trace={}
+ assert(R.run(plan):match('^OK'));assert(R.installed.ServerCommand[1].version=='2.3.15')
+ assert(R.localSource(p).version=='2.3.15')
+ for _,v in ipairs(trace) do if v:match('^scan:') then assert(v=='scan:'..drives[2].props.Path..'/plugins/ServerCommand',v) end end
+end)
+test('A new slot is stored before its exact object handle receives Import',function()
+ setup();local result=R.run(R.plan({ServerCommand=1}));assert(result:match('^OK'),result)
+ assert(#calls==1 and calls[1]=='Store DataPool 4 Plugin 1 /NoConfirmation')
+ assert(#imports==1 and imports[1].handle==pool.Plugins[1])
+end)
+test('A successful import/version with stale Lua code is rejected',function()
+ setup({installed='2.3.14',staleCode=true});local result=R.run(R.plan({ServerCommand=1}))
+ assert(result:match('^FAILED') and result:find('Imported Lua did not match',1,true),result)
+end)
+test('Actual MA Search package updates slot 19 using direct import and Lua readback',function()
+ local add=setup({fullCatalog=true});local h=add(19,'0.3.8')
+ h.props.Name='MA Search';h.props.Path='/MASearch'
+ local result=R.run(R.plan({MASearch=1}));assert(result:match('^OK'),result)
+ assert(#calls==0 and #imports==1 and imports[1].handle==h and imports[1].slot==19)
+ assert(imports[1].filename=='MASearch_v0.3.9.xml' and h.props.Version=='0.3.9')
+ assert(h.imported.files['MASearch.lua']==read('packages/MASearch/0.3.9/MASearch/MASearch.lua'))
 end)
 print(count..' runtime scenarios passed (mock MA environment)')

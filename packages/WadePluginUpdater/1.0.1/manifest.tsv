@@ -1,0 +1,6 @@
+WLT-RELEASE	1	WadePluginUpdater	1.0.1	WadePluginUpdater	PluginUpdator_v1.0.1.xml
+FILE	PluginUpdator_v1.0.1.xml	packages/WadePluginUpdater/1.0.1/WadePluginUpdater/PluginUpdator_v1.0.1.xml	110673	89b988d747c722235151862c5f397c4f2f953ad40a37f4f0efd2fd2c474bea7e
+FILE	README.txt	packages/WadePluginUpdater/1.0.1/WadePluginUpdater/README.txt	4096	30e0dc027c93920edc8d1d9b52755f3dba5a93850fa1417ec2f34f24c32b62b0
+FILE	WadePluginUpdater.lua	packages/WadePluginUpdater/1.0.1/WadePluginUpdater/WadePluginUpdater.lua	45305	0b5340c686b8b8626b4ba2f01877a44ca5a9d9efbd1fd1fc6366a38c2ceb8b3a
+FILE	WadePluginUpdater.png	packages/WadePluginUpdater/1.0.1/WadePluginUpdater/WadePluginUpdater.png	79720	38bd2cae034fcfff5a0130eef9e65db2a0de0746dc4bd610c7029aaaa20f133c
+ZIP	PluginUpdator_v1.0.1.zip	releases/PluginUpdator_v1.0.1.zip	179380	76d36d92e9e717716f2b071dab2b76f7ae033d9ce1cf44acf75bc0c8791b9f70

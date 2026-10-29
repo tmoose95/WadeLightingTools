@@ -30,3 +30,13 @@ Use a copy of the show. Launch with two drives attached and confirm the drive sc
 - Stable catalog ID and plugin folder preserved for existing installations.
 - All 63 existing automated scenarios passed, including startup drive scanning.
 - Package XML metadata, embedded image bytes, and release checksums validated.
+
+## WLT Plugin Updator 1.0.2
+
+- Reproduced the reported line 76 compile failure using official Lua 5.5.0.
+- Corrected assignments to read-only loop variables in catalog parsing and Windows UTF-16 encoding.
+- The earlier interpreter-only checks were insufficient for MA3 2.5; validation now requires Lua 5.5 and loads the actual Lua file extracted from the release ZIP.
+- Actual bundled entry point opens after scanning two mocked drives, supports offline startup, binds its appearance and closes.
+- All 63 previous scenarios passed under Lua 5.5; two additional checks cover renamed folders/legacy identity and space-encoded Unix/Windows URLs.
+- Name, archive, import XML, Lua, PNG and install folder use WLT Plugin Updator. The icon now uses green circular update arrows, retaining the Wade LT header, download arrow, border and bottom label.
+- Physical console testing remains outstanding.

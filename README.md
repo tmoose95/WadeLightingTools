@@ -5,7 +5,7 @@ grandMA3 plugins by Aaron Wade, with a static GitHub Pages catalog and an indepe
 ## Project layout
 
 - `docs/`: website and a subpage named for each plugin.
-- `releases/`: original latest revision ZIPs, plus Plugin Updator.
+- `releases/`: original latest revision ZIPs, plus WLT Plugin Updator.
 - `packages/`: immutable unpacked release files and SHA-256 manifests.
 - `catalog.tsv`: machine-readable internet update catalog.
 - `registry.json`: release metadata used to build the site.
@@ -47,3 +47,9 @@ The repository includes source, manifest, page-link and simulated MA runtime che
 See `VERIFICATION.md` for the exact checks performed and the first console check.
 
 Independent implementation. No MATools code, licensing system, or branding is included. Supplied plugin release ownership and attribution remain with their existing authors. This repository does not grant new licensing rights for those packages.
+
+### Lua validation requirement
+
+MA3 2.5 uses Lua 5.5. Set `WLT_LUA55` to a Lua 5.5 executable, with LuaFileSystem available, before running `python3 tools/validate.py`. The check compiles and launches the exact bundled updater against mocked MA objects, including startup drive scanning. Older Lua interpreters are rejected because they miss the loop-variable compile error corrected in 1.0.2.
+
+The updater is named **WLT Plugin Updator**, including its folder and filenames. Its catalog ID remains stable so existing installations can be recognized.

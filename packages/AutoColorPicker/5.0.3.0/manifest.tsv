@@ -1,0 +1,4 @@
+WLT-RELEASE	1	AutoColorPicker	5.0.3.0	AutoColorPicker	AutoColorPicker_v5.0.3.xml
+FILE	AutoColorPicker.lua	packages/AutoColorPicker/5.0.3.0/AutoColorPicker/AutoColorPicker.lua	51630	0efcf4c542365248cc76a53e6fb0034e28aaf44fb2e13334f389a057886a0ba0
+FILE	AutoColorPicker_v5.0.3.xml	packages/AutoColorPicker/5.0.3.0/AutoColorPicker/AutoColorPicker_v5.0.3.xml	129842	b1d047dcd21f476b58983dc4d7cf192279f04e6fa929a9251d8eec8e1134fbdf
+ZIP	AutoColorPicker_v5.0.3.zip	releases/AutoColorPicker_v5.0.3.zip	69427	6ee769d5049008ef459d12cb8bfe91d33394870c6c85d8ba0b1fde1d14c2e848

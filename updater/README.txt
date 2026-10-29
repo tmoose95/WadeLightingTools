@@ -1,168 +1,61 @@
-WLT PLUGIN UPDATOR v1.1.5
+WLT PLUGIN UPDATOR v1.1.6
 Aaron Wade - Crossfade Design
 Target: grandMA3 2.5.1.0 and later 2.5 releases
 
+CONTAINMENT RELEASE - SHOWFILE IMPORTS PAUSED
+The user reported that Import from Drive in v1.1.5 restarted the console for
+all attempted plugin targets. The shared native import path is a suspect;
+the exact crash cause has NOT been established. Automated tests of mocked MA
+objects did not detect this native-console failure.
+
+Both Update Drives + Showfile and Import from Drive are disabled in this
+release, including updater self replacement. Download to Drives remains.
+The runtime rejects both import modes before any batch operation. The released
+Lua contains no native object Import call and no self-update LuaFile worker.
+This contains the affected operation; it is not a native import repair.
+Do not retry the affected import action on a production console.
+
 INSTALL
-1. Close the previous updater and extract this ZIP.
-2. Copy WLT Plugin Updator into grandMA3/gma3_library/datapools/plugins/ on USB.
-3. Edit the existing updater pool slot (or an empty slot), choose your USB,
-   and import WLT Plugin Updator_v1.1.5.xml from that folder.
-4. Run it. A progress window scans connected drives and the showfile before
-   opening the main table. Cancel & Exit stops the scan.
+Close v1.1.5. Extract this ZIP and copy its WLT Plugin Updator folder into
+USB:/grandMA3/gma3_library/datapools/plugins/.
+When programming can be interrupted, use MA3's normal plugin editor to import
+WLT Plugin Updator_v1.1.6.xml into the updater slot. Do not use v1.1.5's import
+actions to install this revision. The green 300 x 300 RGB icon is unchanged.
 
-TABS AND VERSION COLOURS
-- Plugins in your Showfile: recognized WLT plugins across all DataPools.
-- Plugins on your USB Drives: recognized, complete packages on removable drives.
-- More Plugins: catalog plugins not yet in the showfile.
-- Showfile, USB / Drive and Online version cells compare to the live catalog.
-  Green = matches latest. Red = different (older OR newer). Grey = unknown,
-  no copy, or an unavailable online catalog. A newer installed version is never
-  downgraded. Info shows the versions and DataPool names.
-- A showfile cell containing several copies is red if any copy differs.
-- USB / Drive displays the selected source package; an internal source is marked
-  Internal. Tap it to choose another complete version on the selected drives.
-- Scroll the table with the station's native scroll gestures or scrollbar.
-  Selecting row actions preserves the scroll position.
+AVAILABLE WORKFLOW
+- Startup scans the current internal plugin library and connected removable
+  USB plugin libraries. Without USB, only the internal library is scanned.
+  Old software/remote drives, show folders and unrelated files are skipped.
+- Showfile, USB Drives and More Plugins tabs compare versions. Green matches
+  the live catalog, red differs, grey is unknown or unavailable.
+- Choose Download to Drives or Do Nothing for each row. The Action heading
+  selects available downloads or clears the queue. Update reviews the drives
+  and packages before downloading. No showfile plugin code is imported.
+- Downloads verify HTTPS, SHA-256 and byte counts; staged files are read back
+  before promotion. Existing drive folders remain in backups. ZIPs are kept
+  under WadeLightingToolsData/downloads. Newer local packages are protected.
+- The bar and percentage reflect bytes and completed download/write checks.
+  The native System Monitor viewport remains; where unsupported, three labelled
+  updater log lines are shown. Cancel stops further work.
+- QR Code opens the plugin's own GitHub page in a native QR widget. Settings
+  provides drives, rescan and connection details. Move-screen controls remain.
+- The Showfile import paused control explains the temporary restriction.
 
-ACTIONS
-Tap each row's Action selector to queue one action:
-- Do Nothing: no changes for that plugin.
-- Update Drives + Showfile: download online files to selected drives, then import
-  into the reviewed showfile slots. This was previously labelled Import Online.
-- Download to Drives: download files and ZIP without changing the showfile.
-- Import from Drive: import the chosen complete local package without internet.
-The Action column header selects available updates or clears all queued actions.
-Update opens a review listing every action, drive, DataPool and plugin slot.
-Nothing is downloaded or installed just by selecting a row action.
-
-DESTINATIONS
-Drives selects download destinations and permitted local package sources.
-Update Destination defaults to All DataPools; select an individual pool to
-restrict imports. Existing matching plugins retain their slots. If a plugin is
-missing, an empty slot is allocated in each chosen DataPool. The review lists
-all targets. Multiple matching copies are preserved and updated in place.
-
-Settings contains Drives, Rescan and Connection Details.
-The monitor icon opens the display preference layout used in Server Command.
-Tab and queued actions are retained when moving screens.
-
-INTERNET / CONNECTION DETAILS
-Catalog: https://raw.githubusercontent.com/tmoose95/WadeLightingTools/main/catalog.tsv
-Website: https://tmoose95.github.io/WadeLightingTools/
-
-Version 1.1.0 introduced fixes that remove the requirement for a separate timeout utility when using
-OpenSSL on a console. The downloader uses a bounded background process while
-Lua yields. A current Mozilla CA bundle is embedded in the Lua component, so
-certificate checks also work on stations with an incomplete system CA store.
-The USB does not need to stay connected just to provide the certificates.
-
-Linux/macOS: curl, or OpenSSL with peer/hostname validation, or GNU Wget.
-Windows onPC: Windows PowerShell/.NET HTTPS with the system trust store.
-All connections retain certificate validation. No insecure HTTP fallback.
-The updater never changes the console's network configuration.
-
-An unavailable catalog is now labelled Online catalog unavailable. It is not a
-claim that the whole station has no internet. Connection Details displays the
-client and actual error (certificate, DNS, connection timeout, HTTP status, or
-missing client). MA World Server and other updaters contact different services.
-If TLS reports an expired or not-yet-valid certificate, verify station time.
-Local packages remain usable while the catalog is unavailable.
-
-WHAT CHANGED IN 1.1.3
-- More Plugins has a QR Code button for each plugin not installed in any DataPool.
-  Tap it for a large native QR code linking directly to that plugin's page at
-  tmoose95.github.io/WadeLightingTools. The code is generated on the station;
-  the QR window itself does not require an internet connection.
-- The QR window shows the plugin name and exact URL, opens on the current
-  display, and closes with Close or Escape. No image pool slots are created.
-- Includes the import corrections below.
-
-IMPORT CORRECTIONS FROM 1.1.2
-- Corrects the common show-pool import step used by both Import Online and
-  Import from Drive. Download to Drives continues to save the original package.
-- Imports a temporary self-contained XML with Lua embedded as FileContent.
-  Clears component FileName/Installed associations in this temporary copy to
-  avoid MA looking for that code under shared/resource/lib_plugins.
-- Retains the package metadata, image dependencies and component order. The
-  original downloaded/USB files are not rewritten for this conversion.
-- Compares numeric versions so 2.3.15 and 2.3.15.0 match. Exported Lua is checked
-  byte-for-byte (apart from line endings/trailing newlines), including embedded
-  exports. Failed metadata checks report expected and actual values plus backup.
-- Keeps the 1.1.1 scan improvements: current internal/connected USB plugin
-  libraries only, one pass per folder/XML, and no full rescan after updating.
-
-DRIVE SCANNING
-Only the current internal plugin library (Drive 1) and connected removable USB
-libraries are considered. Old-version and remote-station drives are excluded.
-With no USB connected, only the current internal library is scanned and selected.
-Reads catalog plugin folders and XML exports directly at the plugin-library root.
-It never walks showfiles, media, backups, downloads or unrelated directories.
-The current show's plugin metadata is checked in memory; no saved shows are read.
-
-ZIP-only copies must be extracted first. Each local package needs its external Lua files
-beside the XML, or valid embedded Lua content in the XML. Local-source checksums are taken when that package is selected
-for review and checked again before import. Online file and ZIP checksums remain
-mandatory. Settings > Rescan deliberately starts a fresh plugin-folder scan.
-Removed drives are rejected before import.
-
-PACKAGE PROTECTION
-SHA-256 hashes and byte counts are checked against the HTTPS catalog.
-Files are staged and read back before folder replacement. Existing drive folders
-are preserved in WadeLightingToolsData/backups. Download ZIPs are retained in
-WadeLightingToolsData/downloads. Existing show plugins are exported and checked
-before replacement. A missing backup component stops installation. Newer or
-unknown versions and locked plugins are not overwritten. The batch stops at
-its first failure; completed updates are not rolled back automatically.
-
-All three actions also apply to WLT Plugin Updator. Its own showfile replacement
-finishes last: the old window closes, a local LuaFile continuation imports the
-prepared package and verifies its version and Lua code, then shows the result.
-Reopen the plugin after the completion message. No helper pool slot is created.
-Install 1.1.5 manually once if running 1.1.4: its progress-window error occurs
-before downloads/imports start, so it cannot apply this fix itself.
-The catalog ID remains WadePluginUpdater for compatibility with prior names.
-The green update-circle image remains 300 x 300 RGB PNG with 1024-byte blocks.
-Utility Plugins is assigned at runtime rather than using an incompatible XML
-Tags field. The two WLT version-cell colours are added to the UI colour theme;
-existing theme colours are not modified.
+DIAGNOSTICS - NO REPRODUCTION REQUIRED
+Use ListCrashLog to list existing crash entries. CopyCrashLog copies existing
+crash logs to USB; do not add /Remove. DumpLog exports current System Monitor
+text. Preserve the failed import's time, console software version and target.
+The native crash log may require MA support to decode it.
+Official references:
+https://help.malighting.com/grandMA3/2.5/HTML/keyword_copycrashlog.html
+https://help.malighting.com/grandMA3/2.5/HTML/keyword_dumplog.html
 
 VERIFICATION LIMIT
-Lua 5.5 package/startup tests, mocked MA runtime/UI tests, actual local TLS
-certificate/hostname rejection tests and a read-only live GitHub download test
-accompany this revision. These do not replace native console testing.
-The supplied grandMA3.app bundle is macOS 2.4.2.2. This Linux build environment
-cannot execute it, so this release has NOT been run inside grandMA3 onPC.
-Native 2.5.1 imports, touch gestures, screen movement and the desk's HTTPS client
-still need confirmation on the station.
+Automated tests verify import rejection, download behavior, startup/UI,
+checksums, packaging and local TLS. They do not execute grandMA3.
+The supplied grandMA3.app is macOS 2.4.2.2 and cannot run on this Linux host.
+No successful native console/onPC import is claimed. The intended combined
+showfile-and-drive workflow remains pending native diagnosis and validation.
 
-Independent WLT implementation, using the supplied screenshots as a workflow
-reference. No MATools code, account services, advertising or branding included.
-Certificate bundle attribution is in CA-LICENSE.txt.
-
-CHANGES IN 1.1.4
-- Confirm opens a progress panel with a bar and percentage. Download byte counts
-  and completed backup/write/import-verification steps advance overall progress.
-  Stage weights describe work completed, not an estimated time remaining.
-  Progress reaches 100% only when every selected action is verified.
-- A compact native System Monitor viewport shows recent engine messages. The
-  viewport is sized for three lines; font/scaling behavior needs console checking.
-  If unavailable, three explicitly labelled updater activity lines show the
-  latest messages also sent to System Monitor. Byte updates do not flood the log.
-- Existing zero-byte exported Lua components trigger a repair choice after the
-  replacement has been validated and compiled. A damaged-state snapshot and
-  INCOMPLETE-BACKUP.txt are preserved. This snapshot cannot restore working code.
-  Choose Repair from verified package to replace the damaged slots, or Cancel.
-  Missing backups and invalid replacement code still stop the operation.
-- No console/onPC execution is claimed by the automated verification.
-
-CHANGES IN 1.1.5
-- Fixes the progress-window width arithmetic error before import. Numeric layout
-  values are retained locally; MA BaseInput dimensions can return text. The QR
-  popup uses the same correction. UI setup failures also clear the busy state.
-- Update Drives + Showfile is available for every catalog plugin, including this
-  updater. Download-only and offline Import from Drive remain separate options.
-- Self replacement runs through a locally generated LuaFile after the old UI
-  closes. It rechecks slot identity, locks and the prepared XML checksum, imports
-  into the reviewed DataPools, and verifies the resulting Lua through export.
-  It reports failure without reaching 100% when verification fails.
-- Native MA3/onPC execution remains unverified; automated tests use MA mocks.
+Independent WLT implementation. No MATools code, account service or branding.
+Certificate attribution is in CA-LICENSE.txt.

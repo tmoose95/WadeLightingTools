@@ -36,7 +36,7 @@ The updater's internet catalog is served from raw.githubusercontent.com, so onli
 
 ## Updater behavior
 
-Connected MA3 drives are scanned before the main window opens. The UI compares installed, on-drive and online versions and supports Download & Install, Download Only, and Install Only. Selected drive handles/paths and destination pool slots are rechecked before use. Downloads use certificate-validated HTTPS and per-file SHA-256/size verification. Existing drive folders and show plugins are preserved before replacement. A failed batch stops and reports the failure; completed updates are not silently rolled back.
+Connected MA3 drives are scanned before the main window opens. The UI has Showfile, USB Drives and More Plugins tabs with per-plugin Import Online, Download to Drives and Import from Drive actions. Version cells are green for a live-catalog match, red for differing versions and grey for unknown/unavailable versions. A scan dialog supports Cancel & Exit. Choose All DataPools or one destination, then review every target before applying. Selected drive handles/paths and destination pool slots are rechecked before use. Downloads use certificate-validated HTTPS and per-file SHA-256/size verification. Existing drive folders and show plugins are preserved before replacement. A failed batch stops and reports the failure; completed updates are not silently rolled back.
 
 The updater recognizes unpacked XML/Lua packages in their expected plugin folder or at the plugin-library root. ZIP-only copies must be extracted before local installation. The updater downloads the ZIP and the individual install files itself, avoiding an unzip dependency on the console. The updater's own next revision is downloaded and imported manually after closing its running window.
 
@@ -55,3 +55,5 @@ MA3 2.5 uses Lua 5.5. Set `WLT_LUA55` to a Lua 5.5 executable, with LuaFileSyste
 The updater is named **WLT Plugin Updator**, including its folder and filenames. Its catalog ID remains stable so existing installations can be recognized.
 
 Version 1.0.3 also corrects the startup GetPath parameter error. The bundled startup checks now validate MA path arguments with no PathType.UserPlugins enum and exercise both internal and removable-drive library resolution.
+
+Version 1.1.0 adds the table workflow above and corrects the overbroad connectivity label. Console OpenSSL does not require a timeout utility, and a Mozilla CA bundle travels inside the Lua component. Settings > Connection Details shows the actual HTTPS error. The certificate bundle source and attribution are in `updater/ca/`. `tests/transport.py` verifies real local TLS success, certificate rejection, hostname rejection and HTTP error handling; `tests/transport_live.lua` is an optional read-only live GitHub smoke test.

@@ -51,3 +51,16 @@ Use a copy of the show. Launch with two drives attached and confirm the drive sc
 - All archive/manifests, XML references, embedded 300 x 300 RGB icon and website links validated.
 - The green circular-update artwork is unchanged. Physical console operation still needs verification.
 - API references: https://help2.malighting.com/grandMA3/2.5/HTML/lua_objectfree_getpathtype.html and https://help2.malighting.com/grandMA3/2.5/HTML/lua_objectfree_getpathoverridefor.html; provided API_Info_Report(2).json confirms the signatures.
+
+## WLT Plugin Updator 1.1.0
+
+- Replaces the blanket Internet unavailable label with Online catalog unavailable and the actual client/error in Connection Details. The photos do not expose a complete error, so the precise cause on the user's station remains unconfirmed.
+- Console HTTPS no longer depends on a separate timeout executable. OpenSSL receives the request through an explicitly preserved file descriptor; a POSIX watchdog bounds the request. OpenSSL 3 EOF handling still requires complete HTTP framing. Certificate chain and hostname validation remain enabled.
+- Embeds the Mozilla CA bundle dated 2026-10-20 from https://curl.se/ca/cacert.pem. Its SHA-256 is recorded in updater/ca/LICENSE. Curl can retry a failed system trust check with this bundle; OpenSSL uses it directly.
+- Three native MA UI tabs follow the supplied table references: Showfile, USB Drives and More Plugins. Per-row actions, version selection, Info/Help, scroll box/bar, startup scan cancellation, all/individual DataPool selection, review and move-screen callbacks are covered.
+- Versions are green only when a fetched online catalog confirms a match. Older/newer versions are red; unknown/unavailable versions stay grey. All-pool plans preserve existing slots and allocate empty slots for missing plugins.
+- 88 checks passed: 4 bundled-release startup, 13 core, 30 mocked runtime, 16 mocked UI, 21 unchanged Hippo Remote, and 4 actual local TLS scenarios. TLS tests establish successful OpenSSL transfer without timeout, rejection of an untrusted certificate, rejection of a trusted wrong-host certificate, and HTTP 404 rejection.
+- An additional read-only live test downloaded the public GitHub catalog, verified its updater manifest, downloaded the published 1.0.3 ZIP, and matched its SHA-256 using the revised transport's curl path.
+- All 11 release archives, manifests and 12 website pages validate. The green 300 x 300 RGB icon is unchanged.
+- Inspected the supplied grandMA3.app Info.plist: macOS 2.4.2.2. It cannot execute in the Linux build environment. No native grandMA3/onPC 2.5.1 execution is claimed. Console HTTPS, touch gestures, display changes and native imports still need station verification.
+- No other plugin release is changed or added by this revision.

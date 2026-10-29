@@ -9,4 +9,4 @@ PLUGIN	ServerCommand	Server Command	2.3.15	2.5.1.0	ServerCommand	packages/Server
 PLUGIN	TouchConfigurator	Touch Configurator	1.0.41	2.5.1.0	TouchConfigurator	packages/TouchConfigurator/1.0.41/manifest.tsv	e86d264925104d9320e6f8b9dafe93c1913c9962f4bc6500b4ea9dc6f52d6f9d
 PLUGIN	TourLocation	Tour Location	1.0.10	2.5.1.0	TourLocation	packages/TourLocation/1.0.10/manifest.tsv	791b17e25287f88facd6aa3406867da99baa38b95cbd891dd8429db01d4b7b36
 PLUGIN	WingConfigurator	Wing Configurator	1.0.28	2.5.1.0	WingConfigurator	packages/WingConfigurator/1.0.28/manifest.tsv	a8b62d7140487372373248d141b4541c608801ad94b117c6b8f1b3b4b439814a
-PLUGIN	WadePluginUpdater	WLT Plugin Updator	1.0.3	2.5.1.0	WLT Plugin Updator	packages/WadePluginUpdater/1.0.3/manifest.tsv	291b85412ba8c2f3ad349a0b9253cb444749f7a807a1a357ea6770d20d19b78e
+PLUGIN	WadePluginUpdater	WLT Plugin Updator	1.1.0	2.5.1.0	WLT Plugin Updator	packages/WadePluginUpdater/1.1.0/manifest.tsv	4d6ab9380f12224a04164327f629e13f4f2f1ad14d053bc0bb1b64042cb9085b

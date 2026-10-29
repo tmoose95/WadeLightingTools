@@ -15,6 +15,8 @@ class Links(HTMLParser):
 count=0
 for page in (ROOT/'docs').rglob('*.html'):
     parser=Links();parser.feed(page.read_text())
+    archives=[u for u in parser.refs if urlsplit(u).path.lower().endswith('.zip')]
+    assert not archives or page.parent.name=='WadePluginUpdater', 'Paid plugin page exposes a direct download'
     for ref in parser.refs:
         parsed=urlsplit(ref)
         if parsed.scheme or not parsed.path:continue

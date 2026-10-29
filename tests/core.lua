@@ -29,6 +29,46 @@ check('XML metadata + author matching',function()
  assert(not C.xml('<!DOCTYPE GMA3><UserPlugin Name="x" Version="1.0.0"/>'))
 end)
 local T=dofile('updater/src/transport.lua')(C,{})
+check('Renamed folders and prior updater identities',function()
+ assert(C.path('packages/WadePluginUpdater/1.0.2/WLT Plugin Updator/WLT Plugin Updator.lua'))
+ for _,s in ipairs({' leading','trailing ','x/ /y','x/../a','x/%20','a\tfile'})do assert(not C.path(s),s)end
+ local p={id='WadePluginUpdater',name='WLT Plugin Updator',folder='WLT Plugin Updator'}
+ assert(C.matches({Name='Wade Plugin Updater',Path='/WadePluginUpdater',Author='Aaron Wade'},p))
+ assert(C.matches({Name='Plugin Updator',Path='/WadePluginUpdater',Author='Aaron Wade'},p))
+ assert(C.matches({Name='WLT Plugin Updator',Path='/WLT Plugin Updator',Author='Aaron Wade'},p))
+ assert(#C.catalog(text:gsub('\n','\r\n'))==#cat)
+end)
+check('Spaces are URL encoded on Unix and Windows downloads',function()
+ local remote='packages/WadePluginUpdater/1.0.2/WLT Plugin Updator/WLT Plugin Updator.lua'
+ local escaped=remote:gsub(' ','%%20')
+ for _,windows in ipairs({false,true})do
+  local writes,command={},nil
+  local env={work='/mock/work',windows=windows,mkdir=function()return true end,
+   write=function(p,s)writes[p]=s;return true end,exists=function()return true end,now=function()return 0 end,
+   cancelled=function()return false end,pause=function()end,
+   read=function(p)if p:match('/done$')then return'0'elseif p:match('/kind$')then return'body'else return'payload'end end}
+  local execute,remove=os.execute,os.remove
+  os.execute=function(s)command=s;return true end;os.remove=function()return true end
+  local ok,result=pcall(function()return dofile('updater/src/transport.lua')(C,env).get(remote,100)end)
+  os.execute,os.remove=execute,remove
+  assert(ok,result);assert(result=='payload'and command)
+  if windows then
+   local encoded=assert(command:match('EncodedCommand ([A-Za-z0-9+/=]+)'))
+   local alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+   local bits,n,bytes=0,0,{}
+   for c in encoded:gmatch('.')do
+    local digit=alphabet:find(c,1,true)
+    if digit then bits=(bits<<6)|(digit-1);n=n+6;if n>=8 then n=n-8;bytes[#bytes+1]=string.char((bits>>n)&255)end end
+   end
+   local script=table.concat(bytes):gsub('\0','')
+   assert(script:find(escaped,1,true),'Windows URL was not encoded')
+  else
+   local script,request
+   for p,s in pairs(writes)do if p:match('/fetch.sh$')then script=s elseif p:match('/request$')then request=s end end
+   assert(script:find(escaped,1,true)and request:find(escaped,1,true),'Unix URL was not encoded')
+  end
+ end
+end)
 check('OpenSSL HTTP response checks',function()
  assert(T.response('HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\nabc',10)=='abc')
  assert(T.response('HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n3\r\nabc\r\n0\r\n\r\n',10)=='abc')

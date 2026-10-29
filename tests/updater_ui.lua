@@ -17,7 +17,7 @@ local function control(name)
 end
 local displays={};for i=1,3 do local d=object(nil,'Display');d._index=i;d.W=1920;d.H=1080;d.ScreenOverlay=object(d,'Overlay');displays[i]=d end
 local pools={{Name='Main',_index=1},{Name='Tour',_index=2}}
-local root={ColorTheme={ColorGroups={Button={BackgroundNormal='grey',BackgroundPlease='green',TextPlease='yellow',TextDisabled='lightgrey'},Global={Transparent='clear',Text='white'}}},ShowData={Appearances={PluginUpdator_1_0_1={}},DataPools=pools}}
+local root={ColorTheme={ColorGroups={Button={BackgroundNormal='grey',BackgroundPlease='green',TextPlease='yellow',TextDisabled='lightgrey'},Global={Transparent='clear',Text='white'}}},ShowData={Appearances={PluginUpdator_1_0_2={}},DataPools=pools}}
 local R={catalog={{id='ServerCommand',name='Server Command',version='2.3.15'},{id='HippoRemote',name='Hippo Remote',version='1.3.0'}},drives={{path='/usb',label='USB'}},selectedDrives={['/usb']=true},pool=pools[1],online=true,issues={},mode=1}
 R.children=function(h)return h end;R.index=function(h)return h._index end;R.prop=function(h,k)return h[k]or''end
 R.status=function(p)return p.id=='ServerCommand'and'Update available'or'Not installed'end
@@ -45,7 +45,7 @@ local launch=assert(load(read('updater/src/display.lua')..'\n'..read('updater/sr
 local hits={};for name,fn in pairs(sig)do sig[name]=function(...)hits[name]=true;return fn(...)end end
 local count=0;local function test(name,fn)fn();count=count+1;print('PASS '..name)end
 local function click(name)local c=control(name);assert(sig[c.Clicked],c.Clicked or name);sig[c.Clicked](c)end
-test('Startup scans before UI and uses caller display',function()launch();assert(events[1]=='scan');assert(plugin.Appearance==root.ShowData.Appearances.PluginUpdator_1_0_1);assert(control('WadePluginUpdater'):Parent()==displays[2].ScreenOverlay)end)
+test('Startup scans before UI and uses caller display',function()launch();assert(events[1]=='scan');assert(plugin.Appearance==root.ShowData.Appearances.PluginUpdator_1_0_2);assert(control('WadePluginUpdater'):Parent()==displays[2].ScreenOverlay)end)
 test('All visible buttons bind to real callbacks and list uses scrolling',function()for _,c in ipairs(nodes)do if valid(c)and c.Clicked then assert(sig[c.Clicked],c.Clicked)end end;assert(control('PluginScroll')._class=='ScrollBox')end)
 test('Select Updates selects updates only and Clear resets them',function()click('All');assert(control('Update').Text=='UPDATE (1)');assert(control('Item_ServerCommand').Text:find('[x]',1,true));assert(control('Item_HippoRemote').Text:find('[ ]',1,true));click('Clear');assert(control('Update').Text=='UPDATE (0)')end)
 test('Both row selections toggle and mode buttons select all three modes',function()click('Item_HippoRemote');assert(control('Update').Text=='UPDATE (1)');click('Item_HippoRemote');assert(control('Update').Text=='UPDATE (0)');for i=1,3 do click('Mode'..i);assert(R.mode==i and control('Mode'..i).State==1)end end)

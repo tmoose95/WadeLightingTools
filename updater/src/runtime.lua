@@ -1,6 +1,6 @@
 return function(Core,Transport,bootstrap,notify,plugin,trustBundle,selfUpdateFactory)
  local R={catalog=Core.catalog(bootstrap),drives={},localFiles={},installed={},selectedDrives={},cancel=false,mode=2,online=false,issues={},allPools=false,localChoice={},showInstalled={}}
- local IMPORT_PAUSED='Showfile import is temporarily disabled after a reported console restart. Download to Drives remains available. The native import cause is not yet confirmed.'
+ local IMPORT_PAUSED='Import from Drive and Import from Internet are temporarily paused after a reported console restart. The cause is not confirmed. Use the Drives tab to download verified packages; native showfile import testing is still pending.'
  R.importNotice=IMPORT_PAUSED
  local function safe(fn,other) local ok,v=pcall(fn);if ok then return v end;return other end
  local function prop(h,n)
@@ -234,8 +234,8 @@ return function(Core,Transport,bootstrap,notify,plugin,trustBundle,selfUpdateFac
   local a={}
   for _,p in ipairs(R.catalog) do
    local installed=#(R.showInstalled[p.id] or {})>0
-   local usb=false;for _,e in ipairs(R.localFiles[p.id] or {}) do if e.drive.external then usb=true;break end end
-   if (tab==1 and installed) or (tab==2 and usb) or (tab==3 and not installed) then a[#a+1]=p end
+   local drive=false;for _,e in ipairs(R.localFiles[p.id] or {}) do if R.selectedDrives[e.drive.path] then drive=true;break end end
+   if (tab==1 and installed) or (tab==2 and drive) or (tab==3 and not installed) then a[#a+1]=p end
   end
   return a
  end
@@ -268,7 +268,7 @@ return function(Core,Transport,bootstrap,notify,plugin,trustBundle,selfUpdateFac
    local mode=type(selected[p.id])=='number' and selected[p.id] or R.mode
    assert(mode==2,IMPORT_PAUSED)
    local source=mode==3 and R.localSource(p) or nil
-   assert(mode==3 or R.online,'Online catalog is unavailable. Choose Import from Drive for a local copy.')
+   assert(mode==3 or R.online,'Online catalog is unavailable. Reconnect and rescan before downloading.')
    assert(mode~=3 or source,'No complete local package on a selected drive: '..p.name)
    if source then
     local data=assert(read(source.path,16777216),'Local XML no longer exists; rescan')

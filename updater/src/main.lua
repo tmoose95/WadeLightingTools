@@ -1,6 +1,6 @@
 -- Native MA3 table UI. Every action is staged for review before file/show changes.
-local VERSION='1.1.6'
-local ui={actions={},busy=false,tab=1,cells={},activity={}}
+local VERSION='1.1.7'
+local ui={actions={{},{},{}},busy=false,tab=1,cells={},activity={}}
 local R,build,scan
 local function valid(h) return h and safe(function()return IsObjectValid(h)end,false) end
 local function remove(h) if valid(h) then safe(function()Obj.Delete(h:Parent(),Obj.Index(h))end) end end
@@ -73,16 +73,20 @@ end
 local function pluginPage(p)
  return 'https://tmoose95.github.io/WadeLightingTools/'..p.id..'/'
 end
-local ACTIONS={[0]='Do Nothing',[2]='Download to Drives'}
+local ACTIONS={[0]='Do Nothing',[1]='Import from Internet',[2]='Download from Internet',[3]='Import from Drive'}
+local function actions()return ui.actions[ui.tab]end
+local function importNotice()
+ MessageBox({title='Showfile import paused',message=R.importNotice,commands={{value=1,name='Close'}}})
+end
 local function updateActions()
  local count=0
- for id,mode in pairs(ui.actions)do if mode>0 then count=count+1 end end
+ for id,mode in pairs(actions())do if mode>0 then count=count+1 end end
  for id,c in pairs(ui.cells)do if valid(c.action)then
-  local mode=ui.actions[id] or 0
+  local mode=actions()[id] or 0
   c.action.Text=(mode==0 and '×  ' or '↓  ')..ACTIONS[mode]..'  ▾'
   c.action.State=mode>0 and 1 or 0
  end end
- if valid(ui.update)then ui.update.Text='Update ('..count..')'end
+ if valid(ui.update)then ui.update.Text=(ui.tab==1 and 'Import paused' or 'Update Drives ('..count..')')end
 end
 local function drawScan()
  remove(ui.base);ui.base=nil;remove(ui.scanBase)
@@ -110,19 +114,12 @@ local function drawUpdate()
  ui.trackWidth=width-24
  ui.fill=track:Append('UIObject');ui.fill.Name='UpdateProgressFill';ui.fill.Anchors='0,0';ui.fill.AlignmentH='Left';ui.fill.W=0;ui.fill.Visible='No';ui.fill.BackColor=green
  ui.percent=label(track,0,0,'0%','Regular18');ui.percent.Name='UpdatePercent';ui.percent.TextalignmentH='Centre'
- local heading=label(b,0,3,'System Monitor - latest messages','Regular16');heading.Name='UpdateLogHeading'
+ local heading=label(b,0,3,'Updater activity - last 3 messages','Regular16');heading.Name='UpdateLogHeading'
  local panel=grid(b,'UpdateLog',1,1,'0,4');panel.Margin={left=12,right=12,top=0,bottom=0}
- -- Native monitor follows MA messages, including import/export feedback from
- -- the engine. Its viewport is three lines high at the regular 24px line size.
- local monitor=safe(function()
-  if not ClassExists('SystemMonitorWindow')then return end
-  local o=panel:Append('SystemMonitorWindow');o.Name='UpdateSystemMonitor';o.Anchors='0,0';o.Font='Regular16';o.H=72;o.AlignmentV='Bottom';return o
- end,nil)
- if not valid(monitor)then
-  heading.Text='Updater activity - last 3 messages (System Monitor view unavailable)'
-  local lines=grid(panel,'UpdateActivity',1,3,'0,0')
-  for i=1,3 do local o=label(lines,0,i-1,'','Regular16');o.Name='UpdateActivity'..i;ui.activityLabels[i]=o end
- end
+ -- Plain labels show messages also sent by this updater to System Monitor.
+ -- Do not embed native windows whose ownership/lifetime is unverified here.
+ local lines=grid(panel,'UpdateActivity',1,3,'0,0')
+ for i=1,3 do local o=label(lines,0,i-1,'','Regular16');o.Name='UpdateActivity'..i;ui.activityLabels[i]=o end
  button(b,0,5,'CancelUpdate','Cancel & Exit','WLTClose')
 end
 scan=function(connect)
@@ -143,23 +140,34 @@ end)end
 signalTable.WLTAction=function(c)guarded(function()
  local p=findPlugin(c.Name,'Action_');if not p then return end
  local commands={{value=0,name='Do Nothing'}}
- if R.online then
-  commands[#commands+1]={value=2,name='Download to Drives'}
+ if ui.tab==1 then
+  commands[#commands+1]={value=3,name='Import from Drive (paused)'}
+  commands[#commands+1]={value=1,name='Import from Internet (paused)'}
+ elseif ui.tab==2 then
+  if R.online then commands[#commands+1]={value=2,name=ACTIONS[2]}end
+ else
+  commands[#commands+1]={value=1,name='Import from Internet (paused)'}
+  if R.online then commands[#commands+1]={value=2,name=ACTIONS[2]}end
  end
- local a=MessageBox({title=p.name..' - Action',message=R.importNotice..'\n\nChoose Download to Drives, then Update to review the downloads.',commands=commands})
- if a and a.success and ACTIONS[a.result]then ui.actions[p.id]=a.result;updateActions()end
+ local message=ui.tab==1 and R.importNotice or 'Download the online release to the selected drives. Showfile objects are not changed.'
+ local a=MessageBox({title=p.name..' - Action',message=message,commands=commands})
+ if not a or not a.success then return end
+ local allowed=false;for _,cmd in ipairs(commands)do if cmd.value==a.result then allowed=true end end
+ if not allowed then return end
+ if a.result==1 or a.result==3 then importNotice();return end
+ actions()[p.id]=a.result;updateActions()
 end)end
 signalTable.WLTBulk=function()guarded(function()
- local a=MessageBox({title='Actions',message='Apply to plugins shown in this tab.',commands={{value=1,name='Select Available Updates'},{value=2,name='Clear All Actions'},{value=0,name='Cancel'}}})
+ local a=MessageBox({title='Actions',message='Apply to plugins shown in this tab.',commands={{value=1,name='Select Available Updates'},{value=2,name='Clear Tab Actions'},{value=0,name='Cancel'}}})
  if not a or not a.success then return end
- if a.result==2 then ui.actions={}end
+ if a.result==2 then ui.actions[ui.tab]={}end
  if a.result==1 then
+  if ui.tab==1 then importNotice();return end
   for _,p in ipairs(R.visible(ui.tab))do
    if R.online then
-    local behind=false;for _,x in ipairs(R.installed[p.id] or {})do if R.versionStateFor(p,x.version)=='outdated'then behind=true end end
     local localCopy=R.localSource(p)
-    if behind or (ui.tab==2 and localCopy and R.versionStateFor(p,localCopy.version)=='outdated')then
-     ui.actions[p.id]=2
+    if (localCopy and R.versionStateFor(p,localCopy.version)=='outdated') or (ui.tab==3 and not localCopy)then
+     actions()[p.id]=2
     end
    end
   end
@@ -175,7 +183,7 @@ signalTable.WLTDrives=function()guarded(function()
  end
 end)end
 signalTable.WLTPool=function()guarded(function()
- MessageBox({title='Showfile import paused',message=R.importNotice,commands={{value=1,name='Close'}}});return
+ importNotice()
 end)end
 signalTable.WLTUSB=function(c)guarded(function()
  local p=findPlugin(c.Name,'USB_');if not p then return end
@@ -217,7 +225,7 @@ signalTable.WLTQR=function(c)guarded(function()
 end)end
 signalTable.WLTHelp=function(c)guarded(function()
  local p=findPlugin(c.Name,'Help_');if not p then return end
- MessageBox({title=p.name..' - Help',message=R.importNotice..'\n\nGreen = matches latest online version. Red = differs from latest. Grey = unknown or unavailable. Choose Download to Drives to save the verified package. Existing showfile objects are not updated.',commands={{value=1,name='Close'}}})
+ MessageBox({title=p.name..' - Help',message=R.importNotice..'\n\nShowfile tab: Import from Drive or Import from Internet (temporarily paused). Drives tab: Download from Internet.\n\nGreen = matches latest online version. Red = differs from latest. Grey = unknown or unavailable. Drive downloads do not change showfile objects.',commands={{value=1,name='Close'}}})
 end)end
 signalTable.WLTDetails=function()guarded(function()
  local lines={'Online catalog: '..(R.online and 'Loaded' or 'Unavailable'),
@@ -234,7 +242,8 @@ signalTable.WLTSettings=function()guarded(function()
  end
 end)end
 signalTable.WLTUpdate=function()guarded(function()
- local plan=R.plan(ui.actions)
+ if ui.tab==1 then importNotice();return end
+ local plan=R.plan(actions())
  local drives={};for _,d in ipairs(plan.drives)do drives[#drives+1]=d.label end
  local a=MessageBox({title='Review updates',message='Drives: '..table.concat(drives,', ')..'\n\n'..table.concat(plan.lines,'\n\n'),commands={{value=1,name='Update'},{value=0,name='Cancel'}}})
  if not a or not a.success or a.result~=1 then return end
@@ -244,7 +253,7 @@ signalTable.WLTUpdate=function()guarded(function()
  if not ok then notify(tostring(result),nil,nil,true) end
  StopProgress(ui.progress);ui.progress=nil;ui.busy=false;remove(ui.updateBase);ui.updateBase=nil
  MessageBox({title=ok and 'Update results' or 'Update stopped',message=tostring(result),commands={{value=1,name='Close'}}})
- ui.actions={}
+ ui.actions[ui.tab]={}
  if ui.exitAfterCancel then close();return end
  R.refreshInstalled();build(ui.display)
 end)end
@@ -280,7 +289,7 @@ build=function(display)
  local brand=label(banner,0,0,'WADE LT  |  Downloads available - showfile imports paused','Regular20');brand.TextalignmentH='Centre'
  ui.status=label(banner,0,1,#R.drives..' drives scanned  |  '..(R.online and 'Online catalog loaded' or 'Online catalog unavailable - see Settings > Connection Details'));ui.status.TextalignmentH='Centre'
  local tabs=grid(frame,'Tabs',3,1,'0,1')
- for i,text in ipairs({'Plugins in your Showfile','Plugins on your USB Drives','More Plugins'})do
+ for i,text in ipairs({'Plugins in your Showfile','Plugins on your Drives','More Plugins'})do
   local b=button(tabs,i-1,0,'Tab'..i,text,'WLTTab',face);b.State=ui.tab==i and 1 or 0
   if ui.tab==i then b.TextColor=theme.Button.TextPlease end
  end
@@ -298,7 +307,7 @@ build=function(display)
  for i,p in ipairs(entries)do heights[i]=more and 54 or math.max(58,24*#(R.showInstalled[p.id]or{})+12);total=total+heights[i]end
  local list=grid(scroll,'PluginList',n,math.max(1,#entries),'0,0');list.W='100%';list.H=math.max(70,total);columns(list,more)
  if #entries==0 then
-  local empty=label(list,0,0,ui.tab==2 and 'No WLT packages found on USB drives. Extract ZIPs into the plugin library, then Rescan.'or'No plugins in this tab.');empty.Anchors={left=0,right=n-1,top=0,bottom=0}
+  local empty=label(list,0,0,ui.tab==2 and 'No WLT packages found on selected drives. Extract ZIPs into the plugin library, then Rescan.'or'No plugins in this tab.');empty.Anchors={left=0,right=n-1,top=0,bottom=0}
  end
  for row,p in ipairs(entries)do
   local y=row-1;list[1][row].SizePolicy='Fixed';list[1][row].Size=tostring(heights[row])
@@ -328,7 +337,7 @@ build=function(display)
 end
 local function metadata()
  safe(function()
-  local p=myHandle:Parent();local appearance=Root().ShowData.Appearances.PluginUpdator_1_1_6
+  local p=myHandle:Parent();local appearance=Root().ShowData.Appearances.PluginUpdator_1_1_7
   if appearance then p.Appearance=appearance end
   local tag
   for _,t in ipairs(ObjectList('Tag Thru')or{})do if R.prop(t,'Name')=='Utility Plugins'then tag=t;break end end
@@ -341,7 +350,7 @@ return function()
  local old=_G.__WadeLightingToolsWindow
  if old and old.busy then errorbox('An update or scan is already running.');return end
  if old then remove(old.qrBase);remove(old.chooser);remove(old.scanBase);remove(old.updateBase);remove(old.base)end
- _G.__WadeLightingToolsWindow=ui;ui.busy=true;ui.actions={}
+ _G.__WadeLightingToolsWindow=ui;ui.busy=true;ui.actions={{},{},{}}
  local ok,why=pcall(function()
   R=Runtime(Core,Transport,BOOTSTRAP,notify,myHandle:Parent(),TRUST_BUNDLE,SELF_UPDATE_FACTORY)
   R.allPools=true

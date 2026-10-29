@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 OWNER, REPO = 'tmoose95', 'WadeLightingTools'
 RAW = f'https://raw.githubusercontent.com/{OWNER}/{REPO}/main/'
 REGISTRY = ROOT / 'registry.json'
-VERSION = '1.0.0'
+VERSION = '1.0.1'
 
 def sha(data): return hashlib.sha256(data).hexdigest()
 def version(s):
@@ -99,7 +99,7 @@ def catalog(rows):
 
 def updater(bootstrap):
     source = ROOT / 'updater/src'
-    preamble = '''-- Wade Plugin Updater v1.0.0 | Aaron Wade - Crossfade Design | grandMA3 2.5.1
+    preamble = '''-- Plugin Updator v1.0.1 | Aaron Wade - Crossfade Design | grandMA3 2.5.1
 local _,_,signalTable,myHandle=...
 local function safe(fn,fallback) local ok,v=pcall(fn);if ok then return v end;return fallback end
 local function button(parent,column,row,name,text,clicked,color)
@@ -117,24 +117,25 @@ end
     (folder/'WadePluginUpdater.lua').write_text(content)
     png=(ROOT/'docs/assets/WadePluginUpdater.png').read_bytes()
     root=ET.Element('GMA3',DataVersion='2.5.1.0')
-    user=ET.SubElement(root,'UserPlugin',Index='1',Name='Wade Plugin Updater',Path='/WadePluginUpdater',Version=VERSION,
-        Author='Aaron Wade - Crossfade Design',Appearance='WadePluginUpdater',
+    user=ET.SubElement(root,'UserPlugin',Index='1',Name='Plugin Updator',Path='/WadePluginUpdater',Version=VERSION,
+        Author='Aaron Wade - Crossfade Design',Appearance=f'PluginUpdator_{VERSION.replace(chr(46), chr(95))}',
         Note='Scan connected drives, compare installed/local/online versions, and download or install WadeLightingTools releases. Utility Plugins.')
-    dep=ET.SubElement(ET.SubElement(user,'DependencyExport',Size='1'),'Dependency',Address='ShowData.Appearances.WadePluginUpdater')
-    appearance=ET.SubElement(dep,'Appearance',Name='WadePluginUpdater',MediaFileName='CUSTOM/WadePluginUpdater.png',
+    dep=ET.SubElement(ET.SubElement(user,'DependencyExport',Size='1'),'Dependency',Address=f'ShowData.Appearances.PluginUpdator_{VERSION.replace(chr(46), chr(95))}')
+    appearance=ET.SubElement(dep,'Appearance',Name=f'PluginUpdator_{VERSION.replace(chr(46), chr(95))}',MediaFileName='CUSTOM/WadePluginUpdater.png',
         BackR='0',BackG='0',BackB='0',BackAlpha='255',Color='1.0000000000,1.0000000000,1.0000000000,1.0000000000')
-    idep=ET.SubElement(ET.SubElement(appearance,'DependencyExport',Size='1'),'Dependency',Address='ShowData.MediaPools.Images.WadePluginUpdater')
-    image=ET.SubElement(idep,'UserImage',Name='WadePluginUpdater',AddAlpha='No',FileNAme='WadePluginUpdater.png')
+    idep=ET.SubElement(ET.SubElement(appearance,'DependencyExport',Size='1'),'Dependency',Address=f'ShowData.MediaPools.Images.PluginUpdator_{VERSION.replace(chr(46), chr(95))}')
+    image=ET.SubElement(idep,'UserImage',Name=f'PluginUpdator_{VERSION.replace(chr(46), chr(95))}',AddAlpha='No',FileNAme='WadePluginUpdater.png')
     chunks=[png[i:i+1024] for i in range(0,len(png),1024)]
     fc=ET.SubElement(image,'FileContent',Size=str(len(chunks)))
     for chunk in chunks: ET.SubElement(fc,'Block',Base64=base64.b64encode(chunk).decode())
     ET.SubElement(user,'ComponentLua',Index='1',FileName='WadePluginUpdater.lua',Name='Main')
-    ET.indent(root);ET.ElementTree(root).write(folder/f'WadePluginUpdater_v{VERSION}.xml',encoding='UTF-8',xml_declaration=True)
+    ET.indent(root);ET.ElementTree(root).write(folder/f'PluginUpdator_v{VERSION}.xml',encoding='UTF-8',xml_declaration=True)
     (folder/'WadePluginUpdater.png').write_bytes(png)
     shutil.copyfile(ROOT/'updater/README.txt',folder/'README.txt')
-    output=ROOT/'releases'/f'WadePluginUpdater_v{VERSION}.zip'
+    output=ROOT/'releases'/f'PluginUpdator_v{VERSION}.zip'
     with zipfile.ZipFile(output,'w',zipfile.ZIP_DEFLATED) as z:
-        for f in sorted(folder.iterdir()): z.write(f, f'WadePluginUpdater/{f.name}')
+        for name in ['WadePluginUpdater.lua', 'WadePluginUpdater.png', 'README.txt', f'PluginUpdator_v{VERSION}.xml']:
+            z.write(folder/name, f'WadePluginUpdater/{name}')
     return output
 
 def page(title, body, depth=0):
@@ -159,7 +160,7 @@ def website(rows):
         directory=docs/p['id'];directory.mkdir(exist_ok=True);(directory/'index.html').write_text(page(p['name'],body,1))
     body=f'''<main><section class="hero"><div><p class="eyebrow"><span class="dot"></span> TOOLS FOR THE PROGRAMMER</p><h1>Less setup.<br><span>More show.</span></h1><p class="lede">A growing collection of grandMA3 plugins by Aaron Wade. Find the current revision, download it, and get back to programming.</p><div class="actions"><a class="primary" href="#plugins">Explore plugins <span>↓</span></a><a class="secondary" href="WadePluginUpdater/">Get the updater ↗</a></div></div><div class="console-art" aria-hidden="true"><div class="art-label">WADE / LIGHTING TOOLS <span>01 — {len(rows):02d}</span></div><div class="art-screen"><span>WLT</span><i></i><i></i><i></i><i></i></div><div class="art-faders"><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="art-foot">BUILT AROUND YOUR WORKFLOW</div></div></section>
 <section id="plugins"><div class="section-head"><div><p class="eyebrow">THE COLLECTION</p><h2>Your tools. One place.</h2></div><p>{len(rows)} plugins · Versioned downloads</p></div><div class="catalog">{''.join(cards)}</div></section>
-<section class="updater-banner"><div><p class="eyebrow">WADE PLUGIN UPDATER</p><h2>Keep your toolkit current.</h2><p>Scan connected drives, compare versions, and update selected plugins from one window.</p></div><a class="primary" href="WadePluginUpdater/">Meet the updater ↗</a></section></main>'''
+<section class="updater-banner"><div><p class="eyebrow">PLUGIN UPDATOR</p><h2>Keep your toolkit current.</h2><p>Scan connected drives, compare versions, and update selected plugins from one window.</p></div><a class="primary" href="WadePluginUpdater/">Meet the updater ↗</a></section></main>'''
     (docs/'index.html').write_text(page('grandMA3 plugins',body));(docs/'.nojekyll').touch()
     (docs/'catalog.json').write_text(json.dumps(rows,indent=2)+'\n')
 

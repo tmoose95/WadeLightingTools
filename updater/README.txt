@@ -1,4 +1,4 @@
-WLT PLUGIN UPDATOR v1.0.2
+WLT PLUGIN UPDATOR v1.0.3
 Aaron Wade - Crossfade Design
 Target: grandMA3 2.5.1.0 and later 2.5 releases
 
@@ -6,7 +6,7 @@ INSTALL
 1. Extract this archive.
 2. Copy WLT Plugin Updator to grandMA3/gma3_library/datapools/plugins/ on USB.
 3. Edit an empty plugin pool slot, select your USB drive, and import
-   WLT Plugin Updator_v1.0.2.xml from the WLT Plugin Updator folder.
+   WLT Plugin Updator_v1.0.3.xml from the WLT Plugin Updator folder.
 4. Run the plugin. It scans connected drives BEFORE opening the main window.
 
 WORKFLOW
@@ -67,9 +67,14 @@ scroll gestures and display movement must still be checked on the console.
 This is an independent implementation of a batch updater workflow. It does not
 use MATools code, licenses, account services or branding.
 
-REVISION 1.0.2
-Fixes Lua 5.5 compile failures caused by assigning to loop variables.
-Plugin, folder and file names are WLT Plugin Updator. The pool artwork uses a green circular update symbol in the center.
-Close the previous updater and import WLT Plugin Updator_v1.0.2.xml into its
+REVISION 1.0.3
+Fixes the startup GetPath parameter error reported on MA3 2.5.1.
+The plugin library path type is read from the running Plugin object with
+GetPathType(plugin, 1); the documented folder-name overload is the fallback.
+No missing PathType.UserPlugins enum is passed to GetPath or GetPathOverrideFor.
+Internal and USB drive paths use the same resolved path type. A drive whose
+library path cannot be resolved is reported and skipped.
+Keeps the WLT Plugin Updator names, green update-circle image and Lua 5.5 fixes.
+Close the previous updater and import WLT Plugin Updator_v1.0.3.xml into its
 existing plugin slot. The catalog ID is retained and previous updater names
 and folders are recognized.

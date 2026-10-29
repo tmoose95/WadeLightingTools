@@ -1,0 +1,13 @@
+{
+  "ServerCommand": "Manage Hippotizer servers, consoles and DMX network nodes from your MA3 session.",
+  "AttributeClone": "Clone selected fixture attributes with separate source and destination lists.",
+  "HippoRemote": "Server Command's Hippo-only interface for selecting and controlling Hippotizer servers.",
+  "TourLocation": "Set touring locations, session timezone and time synchronization settings.",
+  "TouchConfigurator": "Remap touch surfaces and transfer views across your connected displays.",
+  "WingConfigurator": "Identify executor surfaces, assign Wing IDs and organize your desk.",
+  "AutoColorPicker": "Build a color picker from your Groups and Color presets in the current DataPool.",
+  "MASearch": "Find DataPool objects and navigate to them through a dedicated search window.",
+  "CueBeacon": "Create cue-driven executor beacons with configurable start and stop cues.",
+  "APIInfo": "Export grandMA3 API information for plugin development and troubleshooting.",
+  "WadePluginUpdater": "Scan drives, compare versions, and download or install your Wade plugins."
+}

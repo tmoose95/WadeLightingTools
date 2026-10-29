@@ -1,6 +1,6 @@
 # WadeLightingTools
 
-**Current updater: 1.1.6 containment release.** Automated showfile imports are paused after a reported console restart affecting every attempted plugin. Drive downloads remain available. The native crash cause is unconfirmed; earlier mock import results are not evidence of native stability.
+**Current updater: 1.1.8.** Automated showfile imports are paused after a reported console restart affecting every attempted plugin. Drive downloads remain available. The native crash cause is unconfirmed; earlier mock import results are not evidence of native stability.
 
 grandMA3 plugins by Aaron Wade, with a static GitHub Pages catalog and an independent batch updater targeting MA3 2.5.1.
 
@@ -40,7 +40,9 @@ The updater's internet catalog is served from raw.githubusercontent.com, so onli
 
 The updater scans current internal and connected USB plugin libraries and compares showfile, drive and online versions. With no USB attached, only the internal library is scanned. Red/green version cells, QR pages, screen movement, download progress and HTTPS/checksum verification remain available.
 
-In 1.1.6, only **Download to Drives** and **Do Nothing** are selectable. Both showfile import actions are rejected before a batch can write files or change pool objects. The packaged Lua contains no native `:Import` call and no self-replacement LuaFile continuation. A visible notice explains why the actions are paused. This contains the reported restart path; it does not fix or identify the native crash.
+In 1.1.8, the **Showfile** tab keeps **Import from Drive** and **Import from Internet** visible with a pause notice. They cannot execute until native testing resolves the reported restart. The **Drives** tab offers **Download from Internet**. Each tab has its own queue; downloads do not become Showfile actions. Internal packages are visible without a USB drive.
+
+The unverified native System Monitor widget has been removed from the progress popup. Three ordinary labels now show the updater's last messages. The supplied crash log does not confirm that the import step was reached or identify the crash cause. No native crash fix is claimed. The packaged Lua still contains no native `:Import` call or self-replacement LuaFile continuation.
 
 Close v1.1.5 before installing the containment revision through MA3's normal plugin editor when programming can be interrupted. Do not use the affected updater import action or repeat it to obtain diagnostics. Existing logs can be collected with `CopyCrashLog` and `DumpLog`.
 
@@ -97,3 +99,15 @@ Install 1.1.5 manually once when upgrading from 1.1.4, whose progress popup fail
 ## Plugin Updator 1.1.6
 
 Containment after the user reported that importing any plugin from a drive through v1.1.5 restarted the console. Both automated import modes and self replacement are blocked. Downloads, local discovery, version comparison and existing drive backups remain available. Root-cause investigation and the intended combined drive/showfile workflow remain pending native evidence. The following earlier revision notes describe historical behavior, not current support.
+
+
+## Plugin Updator 1.1.7
+
+Separate Showfile and Drives actions and queues; retain visibly paused import choices. The Drives tab includes selected internal packages. Removed the embedded native System Monitor window and retained three updater activity labels with the progress bar. Crash cause and native import validation remain unresolved. Earlier release notes describe historical behavior.
+
+
+## Plugin Updator 1.1.8 — free updater, existing-drive updates
+
+WLT Plugin Updator remains free to download and open. Other plugins can be downloaded through it only when a complete package exists on a currently connected scanned drive, including internal storage. A showfile-only copy does not qualify. The source drive need not be selected as a destination. Planning and whole-batch execution recheck drive availability, XML identity and readable, nonempty Lua before network downloads. UI/bulk actions also apply the rule.
+
+Public product pages keep descriptions and the updater link, with direct package-download buttons only on the free updater page. Existing catalog/package URLs remain operational. **This is not a paywall or license enforcement:** the repository and existing file URLs are still public. Future registered-drive licensing requires a validated drive identity and entitlement service; do not market the current releases as purchase-protected. The import pause and native-testing limitations above still apply.

@@ -1,4 +1,4 @@
-WLT PLUGIN UPDATOR v1.1.4
+WLT PLUGIN UPDATOR v1.1.5
 Aaron Wade - Crossfade Design
 Target: grandMA3 2.5.1.0 and later 2.5 releases
 
@@ -6,7 +6,7 @@ INSTALL
 1. Close the previous updater and extract this ZIP.
 2. Copy WLT Plugin Updator into grandMA3/gma3_library/datapools/plugins/ on USB.
 3. Edit the existing updater pool slot (or an empty slot), choose your USB,
-   and import WLT Plugin Updator_v1.1.4.xml from that folder.
+   and import WLT Plugin Updator_v1.1.5.xml from that folder.
 4. Run it. A progress window scans connected drives and the showfile before
    opening the main table. Cancel & Exit stops the scan.
 
@@ -27,7 +27,8 @@ TABS AND VERSION COLOURS
 ACTIONS
 Tap each row's Action selector to queue one action:
 - Do Nothing: no changes for that plugin.
-- Import Online: download the latest files to the selected drives, then import.
+- Update Drives + Showfile: download online files to selected drives, then import
+  into the reviewed showfile slots. This was previously labelled Import Online.
 - Download to Drives: download files and ZIP without changing the showfile.
 - Import from Drive: import the chosen complete local package without internet.
 The Action column header selects available updates or clears all queued actions.
@@ -113,8 +114,12 @@ before replacement. A missing backup component stops installation. Newer or
 unknown versions and locked plugins are not overwritten. The batch stops at
 its first failure; completed updates are not rolled back automatically.
 
-The running updater cannot replace itself. Choose Download to Drives, close
-it, and manually import the new XML into its existing pool slot.
+All three actions also apply to WLT Plugin Updator. Its own showfile replacement
+finishes last: the old window closes, a local LuaFile continuation imports the
+prepared package and verifies its version and Lua code, then shows the result.
+Reopen the plugin after the completion message. No helper pool slot is created.
+Install 1.1.5 manually once if running 1.1.4: its progress-window error occurs
+before downloads/imports start, so it cannot apply this fix itself.
 The catalog ID remains WadePluginUpdater for compatibility with prior names.
 The green update-circle image remains 300 x 300 RGB PNG with 1024-byte blocks.
 Utility Plugins is assigned at runtime rather than using an incompatible XML
@@ -149,3 +154,15 @@ CHANGES IN 1.1.4
   Choose Repair from verified package to replace the damaged slots, or Cancel.
   Missing backups and invalid replacement code still stop the operation.
 - No console/onPC execution is claimed by the automated verification.
+
+CHANGES IN 1.1.5
+- Fixes the progress-window width arithmetic error before import. Numeric layout
+  values are retained locally; MA BaseInput dimensions can return text. The QR
+  popup uses the same correction. UI setup failures also clear the busy state.
+- Update Drives + Showfile is available for every catalog plugin, including this
+  updater. Download-only and offline Import from Drive remain separate options.
+- Self replacement runs through a locally generated LuaFile after the old UI
+  closes. It rechecks slot identity, locks and the prepared XML checksum, imports
+  into the reviewed DataPools, and verifies the resulting Lua through export.
+  It reports failure without reaching 100% when verification fails.
+- Native MA3/onPC execution remains unverified; automated tests use MA mocks.

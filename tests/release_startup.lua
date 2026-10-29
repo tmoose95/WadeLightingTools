@@ -1,6 +1,9 @@
 -- Compile and run the actual ZIP's Lua chunk with Lua 5.5 and MA object mocks.
 -- No plugin import, show modification, filesystem write, or network request.
 assert(_VERSION=='Lua 5.5','This regression requires Lua 5.5')
+local scenario=arg[2] or 'normal'
+local version=arg[3] or '1.0.3'
+local appearance='PluginUpdator_'..version:gsub('%.','_')
 for _,name in ipairs({'core','transport','runtime','display','main'})do
  assert(loadfile('updater/src/'..name..'.lua'))
 end
@@ -28,7 +31,7 @@ local pool=object(nil,'DataPool',{Name='Main'},1);pool.Plugins=object(pool,'Plug
 local drives=object(nil,'DriveCollect')
 drives._children={object(drives,'Drive',{Name='Internal',Path='/mock/internal',DriveType='Harddisk'},1),
  object(drives,'Drive',{Name='USB',Path='/mock/usb',DriveType='Removeable'},2)}
-local root={Temp={DriveCollect=drives},ShowData={DataPools=object(nil,'DataPools'),Appearances={PluginUpdator_1_0_2={}}},
+local root={Temp={DriveCollect=drives},ShowData={DataPools=object(nil,'DataPools'),Appearances={[appearance]={}}},
  ColorTheme={ColorGroups={Button={BackgroundNormal='grey',BackgroundPlease='green',TextPlease='yellow',TextDisabled='lightgrey'},Global={Transparent='clear',Text='white'}}}}
 root.ShowData.DataPools._children={pool}
 local sig={};local plugin=object(nil,'Plugin');local component={Parent=function()return plugin end}
@@ -36,9 +39,24 @@ local env=setmetatable({},{__index=_G});env._G=env
 env.Root=function()return root end;env.DataPool=function()return pool end
 env.GetFocusDisplay=function()return display end;env.GetDisplayByIndex=function(i)if i==1 then return display end end
 env.IsObjectValid=function(o)return type(o)=='table'and not o._deleted end
-env.GetPath=function()return '/mock/internal/plugins'end
-env.GetPathOverrideFor=function(_,path)return path..'/plugins'end
-env.Enums={PathType={UserPlugins=1}}
+env.GetPath=function(kind,create)
+ assert(type(kind)=='string' or math.type(kind)=='integer','GetPath: wrong parameter #1')
+ assert(kind=='plugins' and create==false,'Unexpected plugin library path request')
+ if scenario=='missing-root' then return nil end
+ return '/mock/internal/plugins'
+end
+env.GetPathOverrideFor=function(kind,path,create)
+ assert(kind=='plugins' and type(path)=='string' and create==false,'GetPathOverrideFor: wrong parameter')
+ return path..'/plugins'
+end
+env.GetPathType=function(handle,content)
+ assert(handle==plugin and content==1,'GetPathType must receive the plugin and User content type')
+ if scenario=='empty-type' then return '' end
+ return 'plugins'
+end
+if scenario=='missing-type' then env.GetPathType=false end
+-- Match the console: there is no PathType.UserPlugins entry.
+env.Enums={PathType={}}
 env.DirList=function(path)events[#events+1]='scan:'..path;return{}end
 env.FileExists=function()return false end
 env.CreateDirectoryRecursive=function()events[#events+1]='offline';return false end
@@ -53,18 +71,31 @@ local chunk=assert(loadfile(assert(arg[1]),'t',env))
 local entry=chunk('WLT Plugin Updator','Main',sig,component)
 assert(type(entry)=='function','Release did not return its main function')
 entry()
+if scenario=='missing-root' then
+ assert(#dialogs==1 and dialogs[1].message:find('MA plugin library path is unavailable',1,true))
+ assert(#events==0,'Failed path lookup must stop before scanning, downloading, or opening a window')
+ assert(env._G.__WadeLightingToolsWindow.busy==false)
+ print('PASS actual release reports unavailable library path without an API argument error')
+ return
+end
 assert(#dialogs==0,dialogs[1]and dialogs[1].message)
 local window,scanned,offline,title,rows=false,false,false,false,0
+local scannedDrives={}
 for _,event in ipairs(events)do
- if event:find('scan:',1,true)==1 then assert(not window);scanned=true end
+ if event:find('scan:',1,true)==1 then
+  assert(not window);scanned=true
+  if event:find('/mock/internal/plugins',1,true) then scannedDrives.internal=true end
+  if event:find('/mock/usb/plugins',1,true) then scannedDrives.usb=true end
+ end
  if event=='offline'then assert(scanned);offline=true end
  if event=='window'then assert(scanned and offline);window=true end
 end
 for _,o in ipairs(nodes)do
- if o._class=='TitleButton'and o.Text=='WLT PLUGIN UPDATOR  v1.0.2'then title=true end
+ if o._class=='TitleButton'and o.Text=='WLT PLUGIN UPDATOR  v'..version then title=true end
  if o.Name and o.Name:find('Item_',1,true)==1 then rows=rows+1 end
 end
+assert(scannedDrives.internal and scannedDrives.usb,'Both internal and USB libraries must be scanned')
 assert(window and title and rows==10,'Bundled release did not build the offline plugin list')
-assert(plugin.Appearance==root.ShowData.Appearances.PluginUpdator_1_0_2)
+assert(plugin.Appearance==root.ShowData.Appearances[appearance])
 assert(type(sig.WLTClose)=='function');sig.WLTClose();assert(env._G.__WadeLightingToolsWindow==nil)
-print('PASS actual release compiles, returns main, scans two drives, opens offline, binds its image, and closes in Lua 5.5')
+print('PASS ['..scenario..'] actual release compiles, returns main, scans two drives, opens offline, binds its image, and closes in Lua 5.5')

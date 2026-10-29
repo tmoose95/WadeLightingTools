@@ -33,9 +33,23 @@ local function setup(options)
  pool=obj({Name='Tour'},4);pool.Plugins=obj();pool.Plugins.list={}
  root={Temp={DriveCollect=obj()},ShowData={DataPools=obj()}};root.Temp.DriveCollect.list=drives;root.ShowData.DataPools.list={pool}
  function Root()return root end;function DataPool()return pool end
- Enums={PathType={UserPlugins=1}}
- function GetPath()return d1.props.Path..'/plugins'end
- function GetPathOverrideFor(_,path)return path..'/plugins'end
+ Enums={PathType={}}
+ local updater=obj({Name='WLT Plugin Updator'},12)
+ local expectedType=options.customPathType or 'plugins'
+ GetPathType=not options.missingPathType and function(handle,content)
+  assert(handle==updater and content==1,'Wrong plugin handle or path content type')
+  return expectedType
+ end or nil
+ function GetPath(kind,create)
+  assert(kind==expectedType and create==false,'GetPath: wrong parameter #1')
+  if options.missingRoot then return nil end
+  return d1.props.Path..'/plugins'
+ end
+ function GetPathOverrideFor(kind,path,create)
+  assert(kind==expectedType and type(path)=='string' and create==false,'GetPathOverrideFor: wrong parameter')
+  if options.missingUSB and path==d2.props.Path then return '' end
+  return path..'/plugins'
+ end
  function IsObjectValid(o)return type(o)=='table' and o.alive==true end
  function CreateDirectoryRecursive(path)return mkdir(path)end
  function FileExists(path)return lfs.attributes(path,'mode')=='file'end
@@ -72,7 +86,7 @@ local function setup(options)
    return result
   end}
  end
- R=Runtime(C,transport,single,function()end)
+ R=Runtime(C,transport,single,function()end,updater)
  R.scan(true)
  return add
 end
@@ -81,6 +95,23 @@ local function localPackage(d,version)
  write(folder..'/Server_Command_v'..version..'.xml','<GMA3><UserPlugin Name="Server Command" Version="'..version..'" Author="Aaron Wade" Path="/ServerCommand"><ComponentLua FileName="Server_Command.lua" /></UserPlugin></GMA3>')
  write(folder..'/Server_Command.lua','return function()end');return folder
 end
+test('Plugin-derived path type is used for internal and USB paths without an enum',function()
+ setup({customPathType='plugin_library_from_object'});assert(#R.drives==3 and R.online)
+ assert(Enums.PathType.UserPlugins==nil)
+end)
+test('Missing GetPathType uses the string folder overload',function()
+ setup({missingPathType=true});assert(#R.drives==3 and R.online)
+end)
+test('Unresolved USB path is reported while remaining drives stay usable',function()
+ setup({missingUSB=true});assert(#R.drives==2 and R.online)
+ assert(#R.issues==1 and R.issues[1]:find('USB A',1,true) and R.issues[1]:find('drive skipped',1,true))
+ assert(R.selectedDrives[drives[3].props.Path] and not R.selectedDrives[drives[2].props.Path])
+end)
+test('Unresolved internal path stops cleanly before scanning or downloading',function()
+ local ok,why=pcall(setup,{missingRoot=true})
+ assert(not ok and tostring(why):find('MA plugin library path is unavailable',1,true))
+ assert(#trace==0 and #calls==0)
+end)
 test('Drive scans precede any internet access',function()
  setup();assert(#R.drives==3 and R.drives[3].number==7)
  local scanned={};for _,e in ipairs(trace)do if e:match('^http')then break end

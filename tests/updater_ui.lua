@@ -17,19 +17,24 @@ local function control(name)
 end
 local displays={};for i=1,3 do local d=object(nil,'Display');d._index=i;d.W=1920;d.H=1080;d.ScreenOverlay=object(d,'Overlay');displays[i]=d end
 local pools={{Name='Main',_index=1},{Name='Tour',_index=2}}
-local root={ColorTheme={ColorGroups={Button={BackgroundNormal='grey',BackgroundPlease='green',TextPlease='yellow',TextDisabled='lightgrey'},Global={Transparent='clear',Text='white'}}},ShowData={Appearances={PluginUpdator_1_0_3={}},DataPools=pools}}
-local R={catalog={{id='ServerCommand',name='Server Command',version='2.3.15'},{id='HippoRemote',name='Hippo Remote',version='1.3.0'}},drives={{path='/usb',label='USB'}},selectedDrives={['/usb']=true},pool=pools[1],online=true,issues={},mode=1}
-R.children=function(h)return h end;R.index=function(h)return h._index end;R.prop=function(h,k)return h[k]or''end
-R.status=function(p)return p.id=='ServerCommand'and'Update available'or'Not installed'end
-R.scan=function(connect)events[#events+1]='scan';if #events==1 then assert(not pcall(control,'WadePluginUpdater'),'Window opened before initial scan')end end
+local root={ColorTheme={ColorGroups={Button={BackgroundNormal='grey',BackgroundPlease='green',TextPlease='yellow',TextDisabled='lightgrey'},Global={Transparent='clear',Text='white',AlertText='red'}}},ShowData={Appearances={PluginUpdator_1_1_0={}},DataPools=pools}}
+local R={catalog={{id='ServerCommand',name='Server Command',version='2.3.15',minimum='2.5.1.0'},{id='HippoRemote',name='Hippo Remote',version='1.3.0',minimum='2.5.1.0'}},drives={{path='/usb',label='USB',external=true}},selectedDrives={['/usb']=true},pool=pools[1],online=true,issues={},mode=1,localChoice={},installed={},showInstalled={}}
+local server=R.catalog[1];local hippo=R.catalog[2]
+R.installed.ServerCommand={{version='2.3.14',poolName='Main'}};R.showInstalled=R.installed
+local source={version='2.3.14',drive=R.drives[1]};R.localFiles={ServerCommand={source},HippoRemote={source}}
+R.children=function(h)return h end;R.pools=function()return pools end;R.index=function(h)return h._index end;R.prop=function(h,k)return h[k]or''end;R.pause=function()end
+R.visible=function(tab)return tab==1 and {server}or(tab==2 and {server,hippo}or{hippo})end
+R.scan=function(connect)events[#events+1]='scan';assert(control('WLTScan'));if #events==1 then assert(not pcall(control,'WadePluginUpdater'),'Main window opened before initial scan')end end
 R.drivesSelected=function()return R.selectedDrives['/usb']and R.drives or{}end
-R.localBest=function()return {version='1.0.0'}end;R.installedText=function()return '1.0.0'end
+R.localSource=function(p)return R.localChoice[p.id]or source end;R.installedText=function(p)return p==server and '2.3.14 (Main)'or'Not installed'end
+R.installedState=function()return R.online and 'outdated'or'unknown'end
+R.versionStateFor=function(p,v)return not R.online and 'unknown'or(v==p.version and 'current'or'outdated')end
 R.refreshInstalled=function()events[#events+1]='pool'end
 local planned,ran=0,0
 R.plan=function(selected)
- local ids={};for id,on in pairs(selected)do if on then ids[#ids+1]=id end end
- assert(#ids>0,'Select at least one plugin')
- planned=planned+1;return {mode=R.mode,drives=R.drivesSelected(),lines=ids}
+ local ids={};for id,mode in pairs(selected)do if mode>0 then ids[#ids+1]=id end end
+ assert(#ids>0,'Choose an action for one or more plugins')
+ planned=planned+1;return {drives=R.drivesSelected(),lines=ids}
 end
 R.run=function(plan)ran=ran+1;return 'Done'end
 local sig={};local plugin=object(nil,'Plugin');local component={Parent=function()return plugin end}
@@ -45,22 +50,69 @@ local launch=assert(load(read('updater/src/display.lua')..'\n'..read('updater/sr
 local hits={};for name,fn in pairs(sig)do sig[name]=function(...)hits[name]=true;return fn(...)end end
 local count=0;local function test(name,fn)fn();count=count+1;print('PASS '..name)end
 local function click(name)local c=control(name);assert(sig[c.Clicked],c.Clicked or name);sig[c.Clicked](c)end
-test('Startup scans before UI and uses caller display',function()launch();assert(events[1]=='scan');assert(plugin.Appearance==root.ShowData.Appearances.PluginUpdator_1_0_3);assert(control('WadePluginUpdater'):Parent()==displays[2].ScreenOverlay)end)
-test('All visible buttons bind to real callbacks and list uses scrolling',function()for _,c in ipairs(nodes)do if valid(c)and c.Clicked then assert(sig[c.Clicked],c.Clicked)end end;assert(control('PluginScroll')._class=='ScrollBox')end)
-test('Select Updates selects updates only and Clear resets them',function()click('All');assert(control('Update').Text=='UPDATE (1)');assert(control('Item_ServerCommand').Text:find('[x]',1,true));assert(control('Item_HippoRemote').Text:find('[ ]',1,true));click('Clear');assert(control('Update').Text=='UPDATE (0)')end)
-test('Both row selections toggle and mode buttons select all three modes',function()click('Item_HippoRemote');assert(control('Update').Text=='UPDATE (1)');click('Item_HippoRemote');assert(control('Update').Text=='UPDATE (0)');for i=1,3 do click('Mode'..i);assert(R.mode==i and control('Mode'..i).State==1)end end)
-test('Drive selection Apply and Cancel',function()answers={{success=true,result=1,states={USB=false}}};click('Drives');assert(not R.selectedDrives['/usb']);answers={{success=true,result=0,states={USB=true}}};click('Drives');assert(not R.selectedDrives['/usb']);answers={{success=true,result=1,states={USB=true}}};click('Drives');assert(R.selectedDrives['/usb'])end)
-test('Destination DataPool changes and refreshes installed versions',function()answers={{success=true,result=2}};click('Pool');assert(R.pool==pools[2]and events[#events]=='pool')end)
-test('Details and Rescan operate',function()click('Details');assert(dialogs[#dialogs].title=='Updater details');click('Rescan');assert(events[#events]=='scan')end)
-test('No selection reports error and review Cancel does not run',function()click('Clear');click('Update');assert(ran==0 and dialogs[#dialogs].message:find('Select at least one plugin'));click('All');answers={{success=true,result=0}};click('Update');assert(planned==1 and ran==0)end)
-test('Review Apply runs requested mode then refreshes and clears',function()answers={{success=true,result=1},{success=true,result=1}};click('Update');assert(ran==1);assert(control('Update').Text=='UPDATE (0)'and events[#events]=='scan')end)
-test('Display chooser disabled screens, Cancel and retained selection',function()click('All');click('Move');assert(control('Display4').Enabled=='No');click('CancelMove');click('Move');click('Display3');assert(control('WadePluginUpdater'):Parent()==displays[3].ScreenOverlay);assert(control('Update').Text=='UPDATE (1)')end)
-test('Busy guards and Close requests safe cancellation',function()
- local old=R.run;R.run=function(plan)
-  click('Clear');click('Mode1');click('Move');click('Close');assert(R.cancel==true);assert(control('Update').Text=='UPDATE (1)');assert(R.mode==3);return 'Cancelled'
- end
- answers={{success=true,result=1},{success=true,result=1}};click('Update');R.run=old;assert(control('WadePluginUpdater'))
+test('Startup scan dialog precedes main UI on caller display',function()launch();assert(events[1]=='scan');assert(plugin.Appearance==root.ShowData.Appearances.PluginUpdator_1_1_0);assert(control('WadePluginUpdater'):Parent()==displays[2].ScreenOverlay);assert(R.allPools)end)
+test('Every button callback exists; table uses native ScrollBox and ScrollBarV',function()
+ for _,c in ipairs(nodes)do if valid(c)and c.Clicked then assert(sig[c.Clicked],c.Clicked)end end
+ assert(control('PluginScroll')._class=='ScrollBox');assert(control('PluginScrollbar').ScrollTarget==control('PluginScroll'))
 end)
-test('Close removes the active window',function()click('Close');assert(not pcall(control,'WadePluginUpdater'));assert(env._G.__WadeLightingToolsWindow==nil)end)
+test('Version cells are red for non-current and green for latest',function()
+ assert(control('Installed_ServerCommand').BackColor=='red');assert(control('USB_ServerCommand').BackColor=='red');assert(control('Online_ServerCommand').BackColor=='green')
+end)
+test('Three tabs filter rows and keep staged actions',function()
+ answers={{success=true,result=1}};click('Action_ServerCommand');assert(control('Update').Text=='Update (1)')
+ local scroll=control('PluginScroll');answers={{success=true,result=2}};click('Action_ServerCommand');assert(control('PluginScroll')==scroll,'Action changes must not reset scroll position')
+ click('Tab3');assert(control('Action_HippoRemote'));assert(not pcall(control,'Action_ServerCommand'));assert(control('Update').Text=='Update (1)')
+ click('Tab2');assert(control('Action_ServerCommand'));click('Tab1')
+end)
+test('Unknown catalog versions never show green or red',function()
+ R.online=false;click('Tab1');assert(control('Installed_ServerCommand').BackColor=='grey'and control('USB_ServerCommand').BackColor=='grey'and control('Online_ServerCommand').BackColor=='grey')
+ assert(control('Online_ServerCommand').Text=='-');R.online=true;click('Tab1')
+end)
+test('Action header bulk-select and clear',function()
+ answers={{success=true,result=2}};click('Bulk');assert(control('Update').Text=='Update (0)')
+ answers={{success=true,result=1}};click('Bulk');assert(control('Update').Text=='Update (1)')
+ answers={{success=true,result=0}};click('Bulk');assert(control('Update').Text=='Update (1)')
+end)
+test('Settings opens Drives; Apply and Cancel work',function()
+ answers={{success=true,result=1},{success=true,result=1,states={USB=false}}};click('Settings');assert(not R.selectedDrives['/usb'])
+ answers={{success=true,result=0,states={USB=true}}};click('Drives');assert(not R.selectedDrives['/usb'])
+ answers={{success=true,result=1,states={USB=true}}};click('Drives');assert(R.selectedDrives['/usb'])
+end)
+test('DataPool selector supports one pool and All DataPools',function()
+ answers={{success=true,result=2}};click('Pool');assert(R.pool==pools[2]and not R.allPools)
+ answers={{success=true,result=-1}};click('Pool');assert(R.allPools)
+end)
+test('Drive version chooser selects actual package',function()
+ answers={{success=true,result=1}};click('USB_ServerCommand');assert(R.localChoice.ServerCommand==source)
+end)
+test('Info, Help, Connection Details and Rescan work',function()
+ click('Info_ServerCommand');assert(dialogs[#dialogs].message:find('2.3.15',1,true))
+ click('Help_ServerCommand');assert(dialogs[#dialogs].message:find('Green = matches latest',1,true))
+ R.connectionError='certificate verify failed';answers={{success=true,result=3}};click('Settings');assert(dialogs[#dialogs].message:find('certificate verify failed',1,true))
+ answers={{success=true,result=2}};click('Settings');assert(events[#events]=='scan')
+end)
+test('No queued action and review cancellation do not update',function()
+ answers={{success=true,result=2}};click('Bulk');click('Update');assert(ran==0 and dialogs[#dialogs].message:find('Choose an action',1,true))
+ answers={{success=true,result=1}};click('Action_ServerCommand');answers={{success=true,result=0}};click('Update');assert(planned==1 and ran==0)
+end)
+test('Confirmed review runs and rescans then clears actions',function()
+ answers={{success=true,result=1},{success=true,result=1}};click('Update');assert(ran==1 and control('Update').Text=='Update (0)')
+end)
+test('Move screen preserves tab and actions; inactive screens disabled',function()
+ click('Tab2');answers={{success=true,result=3}};click('Action_HippoRemote');click('Move');assert(control('Display4').Enabled=='No');click('CancelMove')
+ click('Move');click('Display3');assert(control('WadePluginUpdater'):Parent()==displays[3].ScreenOverlay);assert(control('Tab2').State==1 and control('Update').Text=='Update (1)')
+end)
+test('Busy guards and Cancel stop further work then close',function()
+ local old=R.run;R.run=function()
+  click('Tab3');assert(control('Tab2').State==1);click('Close');assert(R.cancel);return 'Cancelled'
+ end
+ answers={{success=true,result=1},{success=true,result=1}};click('Update');R.run=old
+ assert(not pcall(control,'WadePluginUpdater'));assert(env._G.__WadeLightingToolsWindow==nil)
+end)
+test('Cancel scan closes without creating main window',function()
+ local old=R.scan;R.scan=function()click('CancelScan');assert(R.cancel);error('Cancelled')end
+ launch();assert(not pcall(control,'WadePluginUpdater'));R.scan=old
+end)
+test('Close removes active window',function()launch();click('Close');assert(not pcall(control,'WadePluginUpdater'));assert(env._G.__WadeLightingToolsWindow==nil)end)
 for name in pairs(sig)do assert(hits[name],'Untested callback '..name)end
 print(count..' updater UI scenarios passed; every scripted callback exercised')

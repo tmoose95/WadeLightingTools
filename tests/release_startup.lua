@@ -2,7 +2,7 @@
 -- No plugin import, show modification, filesystem write, or network request.
 assert(_VERSION=='Lua 5.5','This regression requires Lua 5.5')
 local scenario=arg[2] or 'normal'
-local version=arg[3] or '1.0.3'
+local version=arg[3] or '1.1.0'
 local appearance='PluginUpdator_'..version:gsub('%.','_')
 for _,name in ipairs({'core','transport','runtime','display','main'})do
  assert(loadfile('updater/src/'..name..'.lua'))
@@ -80,6 +80,7 @@ if scenario=='missing-root' then
 end
 assert(#dialogs==0,dialogs[1]and dialogs[1].message)
 local window,scanned,offline,title,rows=false,false,false,false,0
+local windows=0
 local scannedDrives={}
 for _,event in ipairs(events)do
  if event:find('scan:',1,true)==1 then
@@ -88,14 +89,14 @@ for _,event in ipairs(events)do
   if event:find('/mock/usb/plugins',1,true) then scannedDrives.usb=true end
  end
  if event=='offline'then assert(scanned);offline=true end
- if event=='window'then assert(scanned and offline);window=true end
+ if event=='window'then windows=windows+1;if windows==1 then assert(not scanned)else assert(scanned and offline);window=true end end
 end
 for _,o in ipairs(nodes)do
- if o._class=='TitleButton'and o.Text=='WLT PLUGIN UPDATOR  v'..version then title=true end
- if o.Name and o.Name:find('Item_',1,true)==1 then rows=rows+1 end
+ if o._class=='TitleButton'and o.Text=='WLT Plugin Updator  v'..version then title=true end
+ if o.Name=='PluginScroll'then rows=rows+1 end
 end
 assert(scannedDrives.internal and scannedDrives.usb,'Both internal and USB libraries must be scanned')
-assert(window and title and rows==10,'Bundled release did not build the offline plugin list')
+assert(window and title and rows==1,'Bundled release did not build the offline showfile tab')
 assert(plugin.Appearance==root.ShowData.Appearances[appearance])
 assert(type(sig.WLTClose)=='function');sig.WLTClose();assert(env._G.__WadeLightingToolsWindow==nil)
 print('PASS ['..scenario..'] actual release compiles, returns main, scans two drives, opens offline, binds its image, and closes in Lua 5.5')

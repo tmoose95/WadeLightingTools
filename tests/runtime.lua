@@ -60,9 +60,10 @@ local function setup(options)
  local clock=0;function Time()clock=clock+.2;return clock end
  function HostOS()return 'Linux'end;function Version()return options.oldRuntime and '2.4.0.0'or '2.5.1.1'end
  function Printf()end
- local function add(slot,ver)
+ local function add(slot,ver,target)
+  target=target or pool
   local h=obj({Name='Server Command',Version=ver or '2.3.14',Author='Aaron Wade',Path='/ServerCommand',Lock='No'},slot)
-  pool.Plugins[slot]=h;pool.Plugins.list[#pool.Plugins.list+1]=h;return h
+  target.Plugins[slot]=h;target.Plugins.list[#target.Plugins.list+1]=h;return h
  end
  if options.installed then add(13,options.installed)end
  if options.two then add(26,options.installed)end
@@ -70,11 +71,12 @@ local function setup(options)
   calls[#calls+1]=command
   if options.importFail then return 'Failed'end
   local file,n,slot,dnum,relative=command:match('Import Plugin Library "([^"]+)" At DataPool (%d+) Plugin (%d+) If Drive (%d+) /Path "([^"]+)"')
-  assert(file and tonumber(n)==4,command);slot=tonumber(slot)
+  local target;for _,candidate in ipairs(root.ShowData.DataPools.list)do if candidate.n==tonumber(n)then target=candidate end end
+  assert(file and target,command);slot=tonumber(slot)
   local drive;for _,d in ipairs(drives)do if d.n==tonumber(dnum)then drive=d end end
   local xml=assert(read(drive.props.Path..'/plugins/'..relative..'/'..file));local m=assert(C.xml(xml))
   if options.noReadback then return 'OK'end
-  local h=pool.Plugins[slot] or add(slot,m.Version);h.props.Version=m.Version
+  local h=target.Plugins[slot] or add(slot,m.Version,target);h.props.Version=m.Version
   return 'Ok'
  end
  local function transport()
@@ -183,5 +185,42 @@ test('Existing drive folder is preserved before promotion',function()
  setup();local folder=localPackage(drives[2],'2.3.14');write(folder..'/user-note.txt','keep me');R.scan(false);R.mode=2
  assert(R.run(R.plan({ServerCommand=true})):match('^OK'));local backup=drives[2].props.Path..'/plugins/WadeLightingToolsData/backups'
  local preserved=false;for stamp in lfs.dir(backup)do if stamp~='.'and stamp~='..'then preserved=preserved or read(backup..'/'..stamp..'/ServerCommand/user-note.txt')=='keep me'end end;assert(preserved)
+end)
+test('Mixed per-row actions use item mode and do not rely on global mode',function()
+ setup();R.mode=3;local plan=R.plan({ServerCommand=2});assert(plan.items[1].mode==2)
+ local result=R.run(plan);assert(result:match('^OK')and#calls==0,result)
+end)
+test('All DataPools plans preserve each existing slot and import into each pool',function()
+ local add=setup({installed='2.3.14'})
+ local second=obj({Name='Main'},1);second.Plugins=obj();root.ShowData.DataPools.list[#root.ShowData.DataPools.list+1]=second
+ add(7,'2.3.14',second);R.allPools=true;R.refreshInstalled()
+ assert(#R.showInstalled.ServerCommand==2 and R.installedText(p,true):find('Main',1,true))
+ local plan=R.plan({ServerCommand=1});assert(#plan.items[1].slots==2)
+ local result=R.run(plan);assert(result:match('^OK'),result);assert(#calls==2)
+ assert(calls[1]:find('DataPool 1 Plugin 7',1,true));assert(calls[2]:find('DataPool 4 Plugin 13',1,true))
+end)
+test('All DataPools allocates a free slot where the plugin is missing',function()
+ setup({installed='2.3.14'});local second=obj({Name='Empty'},2);second.Plugins=obj();root.ShowData.DataPools.list[#root.ShowData.DataPools.list+1]=second
+ R.allPools=true;local plan=R.plan({ServerCommand=1});assert(plan.items[1].slots[1].poolNumber==2 and plan.items[1].slots[1].slot==1)
+end)
+test('Choosing one DataPool leaves other pools visible but out of plan',function()
+ local add=setup({installed='2.3.14'});local second=obj({Name='Other'},2);second.Plugins=obj();root.ShowData.DataPools.list[#root.ShowData.DataPools.list+1]=second
+ add(8,'2.3.14',second);R.refreshInstalled();assert(#R.showInstalled.ServerCommand==2 and#R.installed.ServerCommand==1)
+ local plan=R.plan({ServerCommand=1});assert(#plan.items[1].slots==1 and plan.items[1].slots[1].poolNumber==4)
+end)
+test('Version states handle equal, outdated, newer, unknown and unavailable',function()
+ setup({installed='2.3.14'});assert(R.versionStateFor(p,p.version)=='current')
+ assert(R.versionStateFor(p,'1.0.0')=='outdated');assert(R.versionStateFor(p,'99.0.0')=='newer');assert(R.versionStateFor(p,'?')=='unknown')
+ assert(R.installedState(p)=='outdated');R.online=false;assert(R.installedState(p)=='unknown'and R.versionStateFor(p,p.version)=='unknown')
+end)
+test('Drive source selection chooses the requested complete copy',function()
+ setup();localPackage(drives[2],'2.3.14');localPackage(drives[3],'2.3.15');R.selectedDrives[drives[3].props.Path]=true;R.scan(false)
+ assert(R.localSource(p).version=='2.3.15')
+ for _,e in ipairs(R.localFiles[p.id])do if e.version=='2.3.14'then R.localChoice[p.id]=e end end
+ assert(R.plan({ServerCommand=3}).items[1].source.version=='2.3.14')
+end)
+test('Three views distinguish showfile, USB packages and uninstalled catalog',function()
+ setup({installed='2.3.14'});assert(#R.visible(1)==1 and#R.visible(2)==0 and#R.visible(3)==0)
+ localPackage(drives[2],'2.3.15');R.scan(false);assert(#R.visible(2)==1)
 end)
 print(count..' runtime scenarios passed (mock MA environment)')

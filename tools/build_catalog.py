@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 OWNER, REPO = 'tmoose95', 'WadeLightingTools'
 RAW = f'https://raw.githubusercontent.com/{OWNER}/{REPO}/main/'
 REGISTRY = ROOT / 'registry.json'
-VERSION = '1.0.2'
+VERSION = '1.0.3'
 UPDATER_NAME = 'WLT Plugin Updator'
 UPDATER_FOLDER = UPDATER_NAME
 
@@ -102,7 +102,7 @@ def catalog(rows):
 
 def updater(bootstrap):
     source = ROOT / 'updater/src'
-    preamble = '''-- WLT Plugin Updator v1.0.2 | Aaron Wade - Crossfade Design | grandMA3 2.5.1
+    preamble = '''-- WLT Plugin Updator v1.0.3 | Aaron Wade - Crossfade Design | grandMA3 2.5.1
 local _,_,signalTable,myHandle=...
 local function safe(fn,fallback) local ok,v=pcall(fn);if ok then return v end;return fallback end
 local function button(parent,column,row,name,text,clicked,color)

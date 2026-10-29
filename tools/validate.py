@@ -60,6 +60,7 @@ with tempfile.TemporaryDirectory(prefix='wlt-compile-') as directory:
     with zipfile.ZipFile(ROOT/'releases'/up['archive']) as z:
         main=z.read(up['folder']+'/'+up['name']+'.lua')
     release=Path(directory)/'release.lua';release.write_bytes(main)
-    subprocess.run([lua,'tests/release_startup.lua',str(release)],cwd=ROOT,check=True)
+    for scenario in ('normal','missing-type','empty-type','missing-root'):
+        subprocess.run([lua,'tests/release_startup.lua',str(release),scenario,up['version']],cwd=ROOT,check=True)
 for test in ('tests/core.lua','tests/runtime.lua','tests/updater_ui.lua','tests/hippo_remote.lua'):
     subprocess.run([lua,test],cwd=ROOT,check=True)

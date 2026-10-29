@@ -75,4 +75,29 @@ check('OpenSSL HTTP response checks',function()
  assert(not pcall(T.response,'HTTP/1.1 404 Not Found\r\n\r\nx',10))
  assert(not pcall(T.response,'HTTP/1.1 200 OK\r\nContent-Length: 9\r\n\r\nx',10))
 end)
+check('Base64 decoding validates padding and preserves all byte values',function()
+ local bytes={};for i=0,255 do bytes[#bytes+1]=string.char(i) end
+ local raw=table.concat(bytes);assert(C.unbase64(C.base64(raw))==raw)
+ assert(C.unbase64('Zm9v')=='foo' and C.unbase64('Zg==')=='f' and C.unbase64('')=='')
+ for _,s in ipairs({'Zg=','Z===','====','AA=A','AA==AAAA','AB$C'})do assert(not C.unbase64(s),s)end
+end)
+check('Embedded import clears resource links and retains metadata/dependencies',function()
+ local xml='<GMA3><UserPlugin Index="19" Name="Demo" Version="1.0.0" Author="Aaron Wade" Path="/Demo"><DependencyExport Size="1"><Image Data="unchanged"/></DependencyExport><ComponentLua Index="7" Name="Main" FileName="Main.lua" Installed="Yes" Source="Library"/></UserPlugin></GMA3>'
+ local code='return function() return "demo" end'
+ local embedded,codes=C.embeddedPlugin(xml,function(name)assert(name=='Main.lua');return code end)
+ assert(codes[1]==code and C.luaContents(embedded,error)[1]==code)
+ assert(not embedded:match('<UserPlugin[^>]*Index='))
+ assert(embedded:find('FileName=""',1,true) and embedded:find('Installed="No"',1,true))
+ assert(embedded:find('<DependencyExport Size="1"><Image Data="unchanged"/></DependencyExport>',1,true))
+ local m=C.xml(embedded);assert(m.componentCount==1 and #m.components==0 and m.Path=='/Demo')
+end)
+check('Invalid or missing Lua and corrupt embedded blocks are rejected',function()
+ local start='<GMA3><UserPlugin Name="Demo" Version="1.0.0">';local finish='</UserPlugin></GMA3>'
+ local xml=start..'<ComponentLua FileName="Main.lua"/>'..finish
+ assert(not pcall(C.embeddedPlugin,xml,function()return nil end))
+ assert(not pcall(C.embeddedPlugin,xml,function()return 'return function( bad' end))
+ local bad=start..'<ComponentLua><FileContent Size="2"><Block Base64="YWJj"/></FileContent></ComponentLua>'..finish
+ assert(not pcall(C.luaContents,bad,error))
+ assert(not pcall(C.embeddedPlugin,xml:gsub(finish,start..finish..finish),function()return 'return function()end'end))
+end)
 print(count..' core checks passed')

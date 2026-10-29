@@ -79,10 +79,19 @@ local function setup(options)
    assert(folder:sub(1,1)=='/' and not filename:find('/'),'Object Import requires directory and filename')
    if options.importFail then return false end
    local xml=assert(read(folder..'/'..filename));local m=assert(C.xml(xml))
+   -- Reproduce the console's resource lookup: the native object import does
+   -- not resolve external FileName beside this XML, even when that file exists.
+   if #m.components>0 then self.resourceMissing=true;return true end
    if options.noReadback then return true end
    self.props.Name=m.Name;self.props.Version=m.Version;self.props.Path=m.Path
+   if options.normalizedVersion then self.props.Version=m.Version..'.0' end
    self.imported={xml=xml,files={}}
-   for _,f in ipairs(m.components) do self.imported.files[f]=options.staleCode and 'old code' or assert(read(folder..'/'..f)) end
+   if options.staleCode then
+    self.imported.xml=xml:gsub('(<ComponentLua[^>]*>).-</ComponentLua>',function(header)
+     return header..'<FileContent Size="1"><Block Base64="b2xkIGNvZGU="/></FileContent></ComponentLua>'
+    end,1)
+   end
+   self.imported.codes=C.luaContents(self.imported.xml,function()error('Unexpected external code lookup')end)
    return true
   end
   target.Plugins[slot]=h;target.Plugins.list[#target.Plugins.list+1]=h;return h
@@ -148,10 +157,12 @@ test('Download Only writes ZIP and files without importing show objects',functio
  local result=R.run(R.plan({ServerCommand=true}));assert(result:match('^OK'),result);assert(#calls==0)
  for _,d in ipairs({drives[2],drives[3]})do assert(read(d.props.Path..'/plugins/ServerCommand/Server_Command_v2.3.15.xml'));assert(read(d.props.Path..'/plugins/WadeLightingToolsData/downloads/ServerCommand_v2.3.15.zip'))end
 end)
-test('Object import uses absolute file paths and existing DataPool handles',function()
+test('Online import embeds Lua and uses exact existing DataPool handles',function()
  setup({installed='2.3.14',two=true});local result=R.run(R.plan({ServerCommand=true}));assert(result:match('^OK'),result)
  assert(#calls==0 and #imports==2 and imports[1].pool==pool and imports[1].slot==13 and imports[2].slot==26)
- assert(imports[1].folder==drives[2].props.Path..'/plugins/ServerCommand')
+ assert(imports[1].folder:find(drives[1].props.Path..'/plugins/WadeLightingToolsData/work/import_',1,true)==1)
+ assert(imports[1].filename=='Plugin.xml' and not pool.Plugins[13].resourceMissing)
+ assert(pool.Plugins[13].imported.codes[1]==read('packages/ServerCommand/2.3.15/ServerCommand/Server_Command.lua'))
  assert(pool.Plugins[13].props.Version=='2.3.15' and pool.Plugins[26].props.Version=='2.3.15')
 end)
 test('New plugins choose only an empty slot',function()
@@ -247,7 +258,7 @@ test('No USB uses only internal library and selects it for downloads/imports',fu
  assert(#R.drives==1 and R.drives[1].number==1 and R.selectedDrives[drives[1].props.Path])
  for _,v in ipairs(trace) do assert(not v:find('gma3_2.4.2',1,true) and not v:find('/remote',1,true)) end
  local result=R.run(R.plan({ServerCommand=1}));assert(result:match('^OK'),result)
- assert(#imports==1 and imports[1].folder==drives[1].props.Path..'/plugins/ServerCommand')
+ assert(#imports==1 and imports[1].folder:find(drives[1].props.Path..'/plugins/WadeLightingToolsData/work/import_',1,true)==1)
 end)
 test('Old software/remote drives skipped while both connected USBs are scanned',function()
  setup({oldVersions=true});assert(#R.drives==3 and R.scanStats.skipped==2)
@@ -302,7 +313,38 @@ test('Actual MA Search package updates slot 19 using direct import and Lua readb
  h.props.Name='MA Search';h.props.Path='/MASearch'
  local result=R.run(R.plan({MASearch=1}));assert(result:match('^OK'),result)
  assert(#calls==0 and #imports==1 and imports[1].handle==h and imports[1].slot==19)
- assert(imports[1].filename=='MASearch_v0.3.9.xml' and h.props.Version=='0.3.9')
- assert(h.imported.files['MASearch.lua']==read('packages/MASearch/0.3.9/MASearch/MASearch.lua'))
+ assert(imports[1].filename=='Plugin.xml' and h.props.Version=='0.3.9')
+ assert(h.imported.codes[1]==read('packages/MASearch/0.3.9/MASearch/MASearch.lua'))
+end)
+test('Drive import replaces two existing pool slots with embedded code offline',function()
+ setup({offline=true,installed='2.3.14',two=true})
+ local folder=localPackage(drives[2],'2.3.15');R.scan(false)
+ local before=read(folder..'/Server_Command_v2.3.15.xml')
+ local result=R.run(R.plan({ServerCommand=3}));assert(result:match('^OK'),result)
+ assert(#imports==2 and #calls==0)
+ for _,slot in ipairs({13,26}) do
+  local h=pool.Plugins[slot];assert(h.props.Version=='2.3.15' and not h.resourceMissing)
+  assert(h.imported.codes[1]=='return function()end')
+  assert(h.imported.xml:find('FileName=""',1,true) and h.imported.xml:find('Installed="No"',1,true))
+ end
+ assert(read(folder..'/Server_Command_v2.3.15.xml')==before,'Source XML must not change')
+end)
+test('Equivalent three/four-part imported versions pass code verification',function()
+ setup({installed='2.3.14',normalizedVersion=true})
+ local result=R.run(R.plan({ServerCommand=1}));assert(result:match('^OK'),result)
+ assert(pool.Plugins[13].props.Version=='2.3.15.0')
+end)
+test('Unchanged native metadata reports actual and expected values plus backup',function()
+ setup({installed='2.3.14',noReadback=true})
+ local result=R.run(R.plan({ServerCommand=1}))
+ assert(result:match('^FAILED') and result:find('expected Server Command 2.3.15',1,true),result)
+ assert(result:find('found Server Command 2.3.14',1,true) and result:find('Backup:',1,true),result)
+end)
+test('Invalid drive Lua stops before any pool object receives Import',function()
+ setup({offline=true,installed='2.3.14'});local folder=localPackage(drives[2],'2.3.15');R.scan(false)
+ write(folder..'/Server_Command.lua','return function( broken')
+ local result=R.run(R.plan({ServerCommand=3}))
+ assert(result:match('^FAILED') and result:find('Lua component does not compile',1,true),result)
+ assert(#imports==0 and pool.Plugins[13].props.Version=='2.3.14')
 end)
 print(count..' runtime scenarios passed (mock MA environment)')

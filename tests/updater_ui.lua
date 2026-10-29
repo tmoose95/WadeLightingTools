@@ -17,7 +17,7 @@ local function control(name)
 end
 local displays={};for i=1,3 do local d=object(nil,'Display');d._index=i;d.W=1920;d.H=1080;d.ScreenOverlay=object(d,'Overlay');displays[i]=d end
 local pools={{Name='Main',_index=1},{Name='Tour',_index=2}}
-local root={ColorTheme={ColorGroups={Button={BackgroundNormal='grey',BackgroundPlease='green',TextPlease='yellow',TextDisabled='lightgrey'},Global={Transparent='clear',Text='white',AlertText='red'}}},ShowData={Appearances={PluginUpdator_1_1_1={}},DataPools=pools}}
+local root={ColorTheme={ColorGroups={Button={BackgroundNormal='grey',BackgroundPlease='green',TextPlease='yellow',TextDisabled='lightgrey'},Global={Transparent='clear',Text='white',AlertText='red'}}},ShowData={Appearances={PluginUpdator_1_1_3={}},DataPools=pools}}
 local R={catalog={{id='ServerCommand',name='Server Command',version='2.3.15',minimum='2.5.1.0'},{id='HippoRemote',name='Hippo Remote',version='1.3.0',minimum='2.5.1.0'}},drives={{path='/usb',label='USB',external=true}},selectedDrives={['/usb']=true},pool=pools[1],online=true,issues={},mode=1,localChoice={},installed={},showInstalled={}}
 local server=R.catalog[1];local hippo=R.catalog[2]
 R.installed.ServerCommand={{version='2.3.14',poolName='Main'}};R.showInstalled=R.installed
@@ -42,6 +42,7 @@ local env=setmetatable({signalTable=sig,myHandle=component,Core={},Transport={},
 function env.safe(fn,fallback)local ok,v=pcall(fn);if ok then return v end;return fallback end
 function env.button(parent,col,row,name,text,clicked,color)local b=parent:Append('Button');b.Name=name;b.Text=text;b.Clicked=clicked;b.BackColor=color;b.Anchors={left=col,right=col,top=row,bottom=row};return b end
 env.Root=function()return root end;env.GetFocusDisplay=function()return displays[2]end;env.GetDisplayByIndex=function(i)return displays[i]end;env.IsObjectValid=valid
+env.ClassExists=function(name)return name=='QRCode'end
 env.Obj={Index=function(o)if o._index then return o._index end;for i,c in ipairs(o._parent._children)do if c==o then return i end end end,Delete=function(parent,i)delete(table.remove(parent._children,i))end}
 env.MessageBox=function(d)dialogs[#dialogs+1]=d;return table.remove(answers,1)or{success=true,result=0}end
 env.StartProgress=function()return 1 end;env.StopProgress=function()end;env.SetProgressText=function()end;env.ObjectList=function()return{}end;env.Cmd=function()return'OK'end
@@ -50,7 +51,7 @@ local launch=assert(load(read('updater/src/display.lua')..'\n'..read('updater/sr
 local hits={};for name,fn in pairs(sig)do sig[name]=function(...)hits[name]=true;return fn(...)end end
 local count=0;local function test(name,fn)fn();count=count+1;print('PASS '..name)end
 local function click(name)local c=control(name);assert(sig[c.Clicked],c.Clicked or name);sig[c.Clicked](c)end
-test('Startup scan dialog precedes main UI on caller display',function()launch();assert(events[1]=='scan');assert(plugin.Appearance==root.ShowData.Appearances.PluginUpdator_1_1_1);assert(control('WadePluginUpdater'):Parent()==displays[2].ScreenOverlay);assert(R.allPools)end)
+test('Startup scan dialog precedes main UI on caller display',function()launch();assert(events[1]=='scan');assert(plugin.Appearance==root.ShowData.Appearances.PluginUpdator_1_1_3);assert(control('WadePluginUpdater'):Parent()==displays[2].ScreenOverlay);assert(R.allPools)end)
 test('Every button callback exists; table uses native ScrollBox and ScrollBarV',function()
  for _,c in ipairs(nodes)do if valid(c)and c.Clicked then assert(sig[c.Clicked],c.Clicked)end end
  assert(control('PluginScroll')._class=='ScrollBox');assert(control('PluginScrollbar').ScrollTarget==control('PluginScroll'))
@@ -63,6 +64,47 @@ test('Three tabs filter rows and keep staged actions',function()
  local scroll=control('PluginScroll');answers={{success=true,result=2}};click('Action_ServerCommand');assert(control('PluginScroll')==scroll,'Action changes must not reset scroll position')
  click('Tab3');assert(control('Action_HippoRemote'));assert(not pcall(control,'Action_ServerCommand'));assert(control('Update').Text=='Update (1)')
  click('Tab2');assert(control('Action_ServerCommand'));click('Tab1')
+end)
+test('More Plugins offers QR pages for uninstalled plugins without changing row height',function()
+ click('Tab3');assert(control('QR_HippoRemote').Text=='QR Code')
+ assert(not pcall(control,'QR_ServerCommand'))
+ assert(control('Headings').Columns==6 and control('PluginList')[1][1].Size=='54')
+ click('Tab1');assert(not pcall(control,'QR_HippoRemote'))
+end)
+test('QR popup uses native widget, exact plugin URL and caller display offline',function()
+ R.online=false;click('Tab3');click('QR_HippoRemote')
+ local qr=control('PluginPageQR');local popup=control('WLTPluginPage')
+ assert(qr._class=='QRCode' and qr.Text=='https://tmoose95.github.io/WadeLightingTools/HippoRemote/')
+ assert(qr.Icon=='' and qr.ShowText=='No' and qr.W==qr.H and qr.W>=300)
+ assert(popup:Parent()==displays[2].ScreenOverlay and popup.CloseOnEscape=='Yes')
+ assert(control('PluginPageURL').Text:find(qr.Text,1,true))
+ click('CloseQRTitle');assert(not pcall(control,'WLTPluginPage'))
+ R.online=true;click('Tab1')
+end)
+test('Each catalog QR uses its own existing GitHub Pages path',function()
+ local originalCatalog,originalVisible=R.catalog,R.visible
+ R.catalog=dofile('updater/src/core.lua').catalog(read('catalog.tsv'))
+ R.visible=function()return R.catalog end
+ click('Tab3')
+ for _,p in ipairs(R.catalog)do
+  click('QR_'..p.id);assert(control('PluginPageQR').Text=='https://tmoose95.github.io/WadeLightingTools/'..p.id..'/')
+  local page=io.open('docs/'..p.id..'/index.html','rb');assert(page);page:close()
+  click('CloseQR');assert(not pcall(control,'WLTPluginPage'))
+ end
+ R.catalog,R.visible=originalCatalog,originalVisible;click('Tab1')
+end)
+test('QR popup is removed on rebuild and moves to the chosen display on reopen',function()
+ click('Tab3');click('QR_HippoRemote');local old=control('WLTPluginPage')
+ click('QR_HippoRemote');assert(old._deleted)
+ click('Move');click('Display3');assert(not pcall(control,'WLTPluginPage'))
+ click('QR_HippoRemote');assert(control('WLTPluginPage'):Parent()==displays[3].ScreenOverlay)
+ click('CloseQR');click('Move');click('Display2');click('Tab1')
+end)
+test('Missing native QR class reports the usable URL without breaking the list',function()
+ env.ClassExists=function()return false end;click('Tab3');click('QR_HippoRemote')
+ assert(dialogs[#dialogs].message:find('https://tmoose95.github.io/WadeLightingTools/HippoRemote/',1,true))
+ assert(not pcall(control,'WLTPluginPage') and control('WadePluginUpdater'))
+ env.ClassExists=function(name)return name=='QRCode'end;click('Tab1')
 end)
 test('Unknown catalog versions never show green or red',function()
  R.online=false;click('Tab1');assert(control('Installed_ServerCommand').BackColor=='grey'and control('USB_ServerCommand').BackColor=='grey'and control('Online_ServerCommand').BackColor=='grey')

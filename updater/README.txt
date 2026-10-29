@@ -1,4 +1,4 @@
-WLT PLUGIN UPDATOR v1.1.0
+WLT PLUGIN UPDATOR v1.1.1
 Aaron Wade - Crossfade Design
 Target: grandMA3 2.5.1.0 and later 2.5 releases
 
@@ -6,7 +6,7 @@ INSTALL
 1. Close the previous updater and extract this ZIP.
 2. Copy WLT Plugin Updator into grandMA3/gma3_library/datapools/plugins/ on USB.
 3. Edit the existing updater pool slot (or an empty slot), choose your USB,
-   and import WLT Plugin Updator_v1.1.0.xml from that folder.
+   and import WLT Plugin Updator_v1.1.1.xml from that folder.
 4. Run it. A progress window scans connected drives and the showfile before
    opening the main table. Cancel & Exit stops the scan.
 
@@ -49,7 +49,7 @@ INTERNET / CONNECTION DETAILS
 Catalog: https://raw.githubusercontent.com/tmoose95/WadeLightingTools/main/catalog.tsv
 Website: https://tmoose95.github.io/WadeLightingTools/
 
-Version 1.1.0 removes the requirement for a separate timeout utility when using
+Version 1.1.0 introduced fixes that remove the requirement for a separate timeout utility when using
 OpenSSL on a console. The downloader uses a bounded background process while
 Lua yields. A current Mozilla CA bundle is embedded in the Lua component, so
 certificate checks also work on stations with an incomplete system CA store.
@@ -67,13 +67,29 @@ missing client). MA World Server and other updaters contact different services.
 If TLS reports an expired or not-yet-valid certificate, verify station time.
 Local packages remain usable while the catalog is unavailable.
 
+WHAT CHANGED IN 1.1.1
+- Uses MA's object Import(directory, filename) on the exact target plugin,
+  bypassing the Library keyword/cache lookup that failed in the console log.
+- Checks the import result, plugin version and exported Lua contents. Existing
+  show-plugin backups are retained. A reported OK command alone is not success.
+- Reads each plugin directory/XML once per scan, with no startup SHA-256 pass.
+- Reuses scanned metadata after fetching the online catalog. Only newly listed
+  plugin folders need an additional read. Updates refresh affected packages and
+  showfile metadata without triggering a second full drive scan.
+
 DRIVE SCANNING
-Reads the MA plugin library on drives recognized by this station, including
-internal and removable storage. It reads recognized plugin subfolders and XML
-exports at the library root, not every file on disk. Extract ZIPs first; each
-package must contain all external Lua components beside its XML.
-Downloaded packages include both the original ZIP and verified install files;
-no console unzip tool is required. Removed drives are rejected before import.
+Only the current internal plugin library (Drive 1) and connected removable USB
+libraries are considered. Old-version and remote-station drives are excluded.
+With no USB connected, only the current internal library is scanned and selected.
+Reads catalog plugin folders and XML exports directly at the plugin-library root.
+It never walks showfiles, media, backups, downloads or unrelated directories.
+The current show's plugin metadata is checked in memory; no saved shows are read.
+
+ZIP-only copies must be extracted first. Each local package needs its Lua files
+beside the XML. Local-source checksums are taken when that package is selected
+for review and checked again before import. Online file and ZIP checksums remain
+mandatory. Settings > Rescan deliberately starts a fresh plugin-folder scan.
+Removed drives are rejected before import.
 
 PACKAGE PROTECTION
 SHA-256 hashes and byte counts are checked against the HTTPS catalog.

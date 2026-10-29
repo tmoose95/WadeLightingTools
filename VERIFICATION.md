@@ -9,11 +9,14 @@
 - 12 updater UI scenarios: all scripted callbacks, initial scan before window creation, selection, three modes, drive and DataPool choices, review/cancel, error handling, busy cancellation, display movement and close.
 - 21 Hippo Remote v1.3.0 scenarios: every scripted callback, three OSC trigger/reset commands, session and type filtering, grey device faces, confirmed actions, retained display-move selection, settings compatibility, target changes, partial send/reset failures and busy guards.
 - Browser visual review of the static site and Hippo Remote download page.
+- Public GitHub Pages deployment from main/docs, all 11 approved plugin pages, and online catalog verified.
+- All 119 project files matched the published GitHub blob hashes before this verification note was updated; no missing or different package files.
+- Hippo Remote 1.3.0 and Wade Plugin Updater 1.0.0 downloaded through the public website and their SHA-256 hashes matched the tested release archives.
 
 ## Not yet verified
 
-- Public GitHub endpoints and Pages build: publication verification in progress.
 - Native MA3 2.5.1 object import/export, touch controls, screen movement and platform HTTPS clients: no console is connected.
+- Hippotizer receipt and execution of OSC commands: no server is connected.
 
 
 ## First console check

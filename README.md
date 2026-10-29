@@ -38,7 +38,7 @@ The updater's internet catalog is served from raw.githubusercontent.com, so onli
 
 Only the current internal plugin library and connected removable USB plugin libraries are scanned before the main window opens. With no USB attached, only internal storage is scanned and selected. Older software-version and remote drives are excluded. The UI has Showfile, USB Drives and More Plugins tabs with per-plugin Import Online, Download to Drives and Import from Drive actions. Version cells are green for a live-catalog match, red for differing versions and grey for unknown/unavailable versions. A scan dialog supports Cancel & Exit. Choose All DataPools or one destination, then review every target before applying. Selected drive handles/paths and destination pool slots are rechecked before use. Downloads use certificate-validated HTTPS and per-file SHA-256/size verification. Existing drive folders and show plugins are preserved before replacement. A failed batch stops and reports the failure; completed updates are not silently rolled back.
 
-The updater recognizes unpacked XML/Lua packages in their expected plugin folder or at the plugin-library root. ZIP-only copies must be extracted before local installation. The updater downloads the ZIP and the individual install files itself, avoiding an unzip dependency on the console. The updater's own next revision is downloaded and imported manually after closing its running window.
+The updater recognizes unpacked XML/Lua packages in their expected plugin folder or at the plugin-library root. ZIP-only copies must be extracted before local installation. The updater downloads the ZIP and the individual install files itself, avoiding an unzip dependency on the console. The updater can update its own drive and showfile copies. Its self replacement runs last, through a prepared local LuaFile after the old window closes. Reopen it after the result message.
 
 ## Testing scope
 
@@ -79,3 +79,13 @@ Includes the 1.1.2 import corrections. In More Plugins, each uninstalled plugin 
 Updates display a progress bar and percentage driven by transfer bytes and completed backup, drive-write and import-verification steps. The compact native SystemMonitorWindow shows recent engine output. If that native class is unavailable, a clearly labelled fallback shows the last three updater messages sent to System Monitor. Progress reaches 100% only after all reviewed actions have passed verification.
 
 An existing exported Lua component that is zero bytes no longer prevents recovery indefinitely. The updater preserves the damaged export and an INCOMPLETE-BACKUP.txt notice, validates and compiles the replacement, and asks whether to repair the exact affected slots. Cancel leaves the show slots unchanged. A failed/missing backup or invalid replacement still stops the update.
+
+## Plugin Updator 1.1.5
+
+Fixes the progress-window crash caused by subtracting from a text-valued MA BaseInput width. Popup dimensions now use local numbers; unexpected setup errors release the busy state.
+
+Every plugin, including the updater, offers **Update Drives + Showfile**, **Download to Drives**, and **Import from Drive**. The first action downloads online files to the chosen drives and imports into reviewed DataPool slots. The offline action uses the selected local package.
+
+Self replacement is deferred until the other plugins finish. The old UI closes and a locally generated LuaFile continuation checks the prepared XML checksum and target slots, imports, and verifies exported Lua before reporting success. No extra helper plugin slot is created. Reopen the updater after its completion message.
+
+Install 1.1.5 manually once when upgrading from 1.1.4, whose progress popup fails before the update starts. Automated regression tests cover these paths; native MA3/onPC 2.5.1 execution is not claimed.

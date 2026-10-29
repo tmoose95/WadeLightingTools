@@ -62,7 +62,7 @@ with tempfile.TemporaryDirectory(prefix='wlt-compile-') as directory:
     release=Path(directory)/'release.lua';release.write_bytes(main)
     for scenario in ('normal','missing-type','empty-type','missing-root'):
         subprocess.run([lua,'tests/release_startup.lua',str(release),scenario,up['version']],cwd=ROOT,check=True)
-for test in ('tests/core.lua','tests/runtime.lua','tests/updater_ui.lua','tests/hippo_remote.lua'):
+for test in ('tests/core.lua','tests/runtime.lua','tests/updater_ui.lua','tests/hippo_remote.lua','tests/transport_progress.lua'):
     subprocess.run([lua,test],cwd=ROOT,check=True)
 
 subprocess.run(['python3','tests/embedded_payloads.py'],cwd=ROOT,check=True)

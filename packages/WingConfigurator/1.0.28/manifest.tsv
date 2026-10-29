@@ -1,0 +1,5 @@
+WLT-RELEASE	1	WingConfigurator	1.0.28	WingConfigurator	WingConfigurator_v1.0.28.xml
+FILE	README.txt	packages/WingConfigurator/1.0.28/WingConfigurator/README.txt	2962	dd99d376995bcf1a9e43d8f97675435990dde137738623df52e9e3284b5f083a
+FILE	WingConfigurator.lua	packages/WingConfigurator/1.0.28/WingConfigurator/WingConfigurator.lua	15746	8ee129cae7f003f994580b941037804b86af7510b522e1ced0e28fd08c3263aa
+FILE	WingConfigurator_v1.0.28.xml	packages/WingConfigurator/1.0.28/WingConfigurator/WingConfigurator_v1.0.28.xml	107395	d4e464137e2d3bfdc0be0ec600d3048448fdd7c1bbe929591c1bb17bb28533ff
+ZIP	WingConfigurator_v1.0.28.zip	releases/WingConfigurator_v1.0.28.zip	86028	4b3d5c014a48431f36e75d2222797257543eb16058469cf0c897ab0af48e4136
